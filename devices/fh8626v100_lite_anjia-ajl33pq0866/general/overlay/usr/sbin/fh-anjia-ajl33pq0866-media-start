@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+# GPIO5 is the common cold-reset line for the two GC1054 sensors on the
+# ANJIA AJL33PQ0866 board.  Stock firmware holds it LOW while the Fullhan
+# media modules initialize and releases it HIGH afterwards.  Omitting this
+# sequence leaves the media core operational but makes GC1054 register writes
+# fail and capture return no frames.  Keep this board wiring here: GPIO5 is
+# not a generic FH8626V100 media-module requirement.
+release_sensor_reset()
+{
+	if [ -d /sys/class/gpio/GPIO5 ]; then
+		echo 1 > /sys/class/gpio/GPIO5/value
+		echo 5 > /sys/class/gpio/unexport 2>/dev/null || true
+	fi
+}
+
+echo 'mux,GPIO5,GPIO5,0' > /proc/driver/pinctrl
+[ -d /sys/class/gpio/GPIO5 ] || echo 5 > /sys/class/gpio/export
+echo out > /sys/class/gpio/GPIO5/direction
+echo 0 > /sys/class/gpio/GPIO5/value
+trap release_sensor_reset 0
+
+fh-media-modules
+
+release_sensor_reset
+trap - 0
+echo "ANJIA AJL33PQ0866 sensor bootstrap complete"

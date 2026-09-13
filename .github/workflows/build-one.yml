@@ -11,6 +11,12 @@ on:
       firmware_ref:
         description: 'OpenIPC/firmware ref (SHA/tag/branch) to clone — for cross-repo bisect of size/regression issues. Defaults to firmware HEAD.'
         required: false
+      firmware_repo:
+        description: 'Firmware repository URL (optional; defaults to OpenIPC/firmware).'
+        required: false
+      kernel_repo:
+        description: 'Linux repository URL (optional; defaults to OpenIPC/linux).'
+        required: false
 
 jobs:
   resolve:
@@ -84,7 +90,9 @@ jobs:
           BUILD_ID:       ${{ needs.resolve.outputs.tag_name }}
           BUILD_SHA:      ${{ needs.resolve.outputs.ref }}
           BUILD_PLATFORM: ${{ inputs.platform }}
+          OPENIPC_FW_REPO: ${{ inputs.firmware_repo }}
           OPENIPC_FW_REV: ${{ inputs.firmware_ref }}
+          OPENIPC_KERNEL_REPO: ${{ inputs.kernel_repo }}
         run: |
           export GIT_HASH=$(git rev-parse --short ${GITHUB_SHA})
           export GIT_BRANCH=${GITHUB_REF_NAME}

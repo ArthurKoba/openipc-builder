@@ -13,6 +13,7 @@
 DEVICE="$1"
 BUILDER_DIR=$(pwd)
 FIRMWARE_DIR="${BUILDER_DIR}/openipc"
+FIRMWARE_REPO="${OPENIPC_FW_REPO:-https://github.com/OpenIPC/firmware.git}"
 TIMESTAMP=$(date +"%Y%m%d%H%M")
 VERSION=$(stat -c"%Y" $0)
 
@@ -127,17 +128,16 @@ echo_c 33 "\nUpdating Builder"
 git pull
 
 rm -rf openipc
-# OPENIPC_FW_REV pins firmware to a specific ref (branch, tag, or SHA) for
-# cross-repo bisect of size/regression issues — set by build-one.yml's
-# firmware_ref input. When unset, clones HEAD of master as before.
+# OPENIPC_FW_REPO selects a firmware fork; OPENIPC_FW_REV pins its ref.
+# Defaults preserve the upstream builder behavior.
 if [ ! -d "$FIRMWARE_DIR" ]; then
     if [ -n "$OPENIPC_FW_REV" ]; then
-        echo_c 33 "\nDownloading Firmware @ ${OPENIPC_FW_REV}"
-        git clone https://github.com/OpenIPC/firmware.git "$FIRMWARE_DIR"
+        echo_c 33 "\nDownloading Firmware from ${FIRMWARE_REPO} @ ${OPENIPC_FW_REV}"
+        git clone "$FIRMWARE_REPO" "$FIRMWARE_DIR"
         git -C "$FIRMWARE_DIR" checkout "$OPENIPC_FW_REV"
     else
-        echo_c 33 "\nDownloading Firmware"
-        git clone --depth=1 https://github.com/OpenIPC/firmware.git "$FIRMWARE_DIR"
+        echo_c 33 "\nDownloading Firmware from ${FIRMWARE_REPO}"
+        git clone --depth=1 "$FIRMWARE_REPO" "$FIRMWARE_DIR"
     fi
     cd "$FIRMWARE_DIR"
 else

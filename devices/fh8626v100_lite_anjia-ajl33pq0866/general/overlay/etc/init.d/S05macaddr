@@ -1,0 +1,77 @@
+#!/bin/sh
+
+is_usable_mac() {
+	mac="$1"
+	echo "$mac" | grep -Eqi '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' || return 1
+	case "$(echo "$mac" | tr A-F a-f)" in
+		00:00:00:00:00:00|ff:ff:ff:ff:ff:ff|10:20:30:40:50:60|00:00:23:34:45:66)
+			return 1
+			;;
+	esac
+	first_octet="${mac%%:*}"
+	[ $((0x$first_octet & 1)) -eq 0 ]
+}
+case "$1" in
+	start)
+		ethaddr="$(fw_printenv -n ethaddr 2>/dev/null)"
+		legacy_random_mac="$(fw_printenv -n random_mac 2>/dev/null)"
+		current_mac="$(cat /sys/class/net/eth0/address 2>/dev/null)"
+
+		if is_usable_mac "$ethaddr"; then
+			selected_mac="$ethaddr"
+			source="ethaddr"
+		elif is_usable_mac "$legacy_random_mac"; then
+			selected_mac="$legacy_random_mac"
+			source="legacy random_mac"
+		elif is_usable_mac "$current_mac"; then
+			selected_mac="$current_mac"
+			source="kernel fallback"
+		else
+			selected_mac="$(od -An -tx1 -N5 /dev/urandom | tr -d ' ' |
+				sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\)$/02:\1:\2:\3:\4:\5/')"
+			source="OpenIPC random fallback"
+		fi
+
+		if ! is_usable_mac "$selected_mac"; then
+			echo "Unable to establish a valid Ethernet MAC address"
+			exit 1
+		fi
+
+		if [ "$selected_mac" != "$ethaddr" ]; then
+			fw_setenv ethaddr "$selected_mac" || exit 1
+			echo "Saved Ethernet MAC as ethaddr from $source: $selected_mac"
+		fi
+
+		# FH8626 boots a legacy ATAG kernel, so U-Boot cannot provide the MAC
+		# through a device tree. Migrate older environments once so the kernel
+		# receives the authoritative ethaddr before registering GMAC.
+		openipc_args="$(fw_printenv -n openipc_args 2>/dev/null)"
+		case "$openipc_args" in
+			*'ethaddr='*)
+				;;
+			'')
+				fw_setenv openipc_args 'setenv bootargs console=${console} mem=${mem} panic=20 mtdparts=${mtdparts} root=/dev/mtdblock5 rootfstype=squashfs ro init=/init ethaddr=${ethaddr}' || exit 1
+				echo "Created OpenIPC bootargs with early Ethernet MAC"
+				;;
+			*)
+				fw_setenv openipc_args "$openipc_args ethaddr=\${ethaddr}" || exit 1
+				echo "Added early Ethernet MAC to OpenIPC bootargs"
+				;;
+		esac
+
+		# Keep a userspace fallback for old bootloaders and recovery environments
+		# which did not pass ethaddr on the kernel command line.
+		if [ "$selected_mac" != "$current_mac" ]; then
+			ip link set dev eth0 address "$selected_mac" || exit 1
+			echo "Applied Ethernet MAC before network startup: $selected_mac"
+		fi
+
+		if [ "$source" = "legacy random_mac" ] &&
+		   fw_printenv -n random_mac >/dev/null 2>&1; then
+			fw_setenv random_mac || exit 1
+			echo "Removed migrated legacy random_mac; ethaddr is authoritative"
+		fi
+		;;
+esac
+
+exit 0

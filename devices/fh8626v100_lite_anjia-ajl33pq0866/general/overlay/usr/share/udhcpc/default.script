@@ -1,0 +1,131 @@
+#!/bin/sh
+
+# Board-local OpenIPC udhcpc script. The AJL33PQ0866 profile leaves its
+# unvalidated RTC disabled, so do not hold network and SSH startup behind NTP.
+# S49ntpd starts the persistent daemon after networking.
+
+[ -z "$1" ] && echo "Error: should be called from udhcpc" && exit 1
+
+RESOLV_CONF="/tmp/resolv.conf"
+[ -e $RESOLV_CONF ] || touch $RESOLV_CONF
+RESOLV_DIR="/tmp/resolv.d"
+mkdir -p "$RESOLV_DIR"
+[ -n "$broadcast" ] && BROADCAST="broadcast $broadcast"
+[ -n "$subnet" ] && NETMASK="netmask $subnet"
+[ -n "$ipv6" ] && ip="$ipv6/128"
+
+[ -z "${IF_WAIT_DELAY}" ] && IF_WAIT_DELAY=10
+
+wait_for_ipv6_default_route() {
+	printf "Waiting for IPv6 default route to appear"
+	while [ $IF_WAIT_DELAY -gt 0 ]; do
+		if ip -6 route list | grep -q default; then
+			printf "\n"
+			return
+		fi
+		sleep 1
+		printf "."
+		: $((IF_WAIT_DELAY -= 1))
+	done
+	printf " timeout!\n"
+}
+
+rebuild_resolv_conf() {
+	TMPFILE=$(mktemp)
+	for resolver in "$RESOLV_DIR/"*; do
+		[ -f "$resolver" ] || continue
+		cat "$resolver" >> "$TMPFILE"
+	done
+	cat "$TMPFILE" > "$RESOLV_CONF"
+	rm -f "$TMPFILE"
+}
+
+remove_interface_dns() {
+	rm -f "$RESOLV_DIR/$interface"
+	rebuild_resolv_conf
+}
+
+remove_interface_default_routes() {
+	while ip route del default dev "$interface" 2>/dev/null; do
+		:
+	done
+}
+
+route_metric() {
+	case "$interface" in
+		eth0) echo 10 ;;
+		wlan0) echo 20 ;;
+		usb0|eth1) echo 30 ;;
+		*) echo 100 ;;
+	esac
+}
+
+case "$1" in
+	deconfig)
+		/sbin/ifconfig $interface up
+		/sbin/ifconfig $interface 0.0.0.0
+		remove_interface_default_routes
+		remove_interface_dns
+
+		if [ -x /usr/sbin/avahi-autoipd ]; then
+			/usr/sbin/avahi-autoipd -c $interface && /usr/sbin/avahi-autoipd -k $interface
+		fi
+		;;
+
+	leasefail|nak)
+		if [ -x /usr/sbin/avahi-autoipd ]; then
+			/usr/sbin/avahi-autoipd -c $interface || /usr/sbin/avahi-autoipd -wD $interface --no-chroot
+		fi
+		fallback=$(fw_printenv -n ipaddr 2>/dev/null || true)
+		fallback_netmask=$(fw_printenv -n netmask 2>/dev/null || true)
+		/sbin/ifconfig "$interface" "${fallback:-192.168.1.10}" \
+			netmask "${fallback_netmask:-255.255.255.0}" up
+		remove_interface_default_routes
+		remove_interface_dns
+		;;
+
+	renew|bound)
+		if [ -x /usr/sbin/avahi-autoipd ]; then
+			/usr/sbin/avahi-autoipd -c $interface && /usr/sbin/avahi-autoipd -k $interface
+		fi
+		/sbin/ifconfig $interface $ip $BROADCAST $NETMASK
+		if [ -n "$ipv6" ]; then
+			wait_for_ipv6_default_route
+		fi
+
+		if [ -n "$router" ]; then
+			remove_interface_default_routes
+			metric=$(route_metric)
+			for i in $router; do
+				ip route add default via "$i" dev "$interface" metric "$metric"
+			done
+		fi
+
+		remove_interface_dns
+		resolver="$RESOLV_DIR/$interface"
+		: > "$resolver"
+
+		if [ -n "$search" ]; then
+			search_list=$search
+		elif [ -n "$domain" ]; then
+			search_list=$domain
+		fi
+
+		[ -n "$search_list" ] &&
+			echo "search $search_list" >> "$resolver"
+
+		for i in $dns; do
+			echo "adding dns $i"
+			echo "nameserver $i" >> "$resolver"
+		done
+		rebuild_resolv_conf
+		;;
+esac
+
+HOOK_DIR="$0.d"
+for hook in "${HOOK_DIR}/"*; do
+	[ -f "${hook}" -a -x "${hook}" ] || continue
+	"${hook}" "${@}"
+done
+
+exit 0

@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# FH8626 media loading is board-controlled because GPIO5 is the shared cold
+# reset for both GC1054 sensors on this ANJIA board.  The board helper keeps
+# that wiring out of the generic SoC module loader while preserving the
+# hardware-proven LOW -> load modules -> HIGH sequence.
+#
+# Stock PQEWN-01 also switches pad66 to GPIO61 before monitoring its reset
+# button. The board uses one-bit SD0, so SD0_DATA_1 is free. Export the pin as
+# an active-low input, but do not attach a destructive factory-reset action
+# until the writable persistence contract is finalized.
+echo "mux,GPIO61,GPIO61,0" > /proc/driver/pinctrl
+[ -d /sys/class/gpio/GPIO61 ] || echo 61 > /sys/class/gpio/export
+echo in > /sys/class/gpio/GPIO61/direction
+/usr/sbin/fh-anjia-ajl33pq0866-light init
+exit 0

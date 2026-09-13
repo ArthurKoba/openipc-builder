@@ -15,6 +15,7 @@ _(based on Buildroot)_
 ### List of known and supported devices
 
 ```
+ANJIA AJL33PQ0866        FH8626V100   GC1054    RTL8188FU_USB    NOR_8M    bring-up
 Aoni EP01J05             T31L         ?         RTL8188FU_USB    NOR_16M   new
 Azarton C1               T20X         JXF23     RTL8189FS_SDIO   NOR_16M   done
 Azarton C1               T31X         GC2053    RTL8189FS_SDIO   NOR_16M   done

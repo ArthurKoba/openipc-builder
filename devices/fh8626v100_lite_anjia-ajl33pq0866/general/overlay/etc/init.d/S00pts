@@ -1,0 +1,18 @@
+#!/bin/sh
+case "$1" in
+start)
+	mkdir -p /dev/pts
+
+	while grep -q ' /dev/pts ' /proc/mounts; do
+		umount /dev/pts 2>/dev/null || break
+	done
+
+	mount -t devpts devpts /dev/pts \
+		-o newinstance,gid=5,mode=620,ptmxmode=666
+
+	if [ -e /dev/pts/ptmx ]; then
+		rm -f /dev/ptmx
+		ln -s pts/ptmx /dev/ptmx
+	fi
+	;;
+esac

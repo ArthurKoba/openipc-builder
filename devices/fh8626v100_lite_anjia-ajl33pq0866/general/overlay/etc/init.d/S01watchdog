@@ -1,0 +1,42 @@
+#!/bin/sh
+
+PIDFILE=/run/watchdog.pid
+LOGFILE=/var/log/watchdog.log
+DEVICE=/dev/watchdog
+
+pid_is_live()
+{
+	[ -s "$PIDFILE" ] || return 1
+	pid="$(cat "$PIDFILE" 2>/dev/null)"
+	[ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
+start()
+{
+	if pid_is_live; then
+		echo "watchdog already running"
+		return 0
+	fi
+	if [ ! -c "$DEVICE" ]; then
+		echo "WARNING: $DEVICE is unavailable; hardware watchdog not started" >&2
+		return 0
+	fi
+	mkdir -p /run /var/log
+	rm -f "$PIDFILE"
+	/sbin/watchdog -F -T 15 -t 5 "$DEVICE" >>"$LOGFILE" 2>&1 &
+	echo "$!" >"$PIDFILE"
+	sleep 1
+	if ! pid_is_live; then
+		echo "ERROR: watchdog feeder failed to remain running" >&2
+		cat "$LOGFILE" >&2 2>/dev/null || true
+		return 1
+	fi
+	echo "Started hardware watchdog (timeout 15s, feed 5s)"
+}
+
+case "${1:-start}" in
+	start) start ;;
+	stop) exit 0 ;;
+	restart) start ;;
+	*) echo "usage: $0 {start|stop|restart}" >&2; exit 2 ;;
+esac

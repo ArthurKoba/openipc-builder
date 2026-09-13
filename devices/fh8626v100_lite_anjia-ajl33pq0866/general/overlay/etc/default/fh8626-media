@@ -1,0 +1,6 @@
+# FH8626 owner/Divinus runtime defaults. Override these from persistent storage
+# or a board customizer without rebuilding either binary.
+FH8626_STREAM_SOCKET=/run/fh8626-divinus.sock
+FH8626_ISP_PROFILE=day
+FH8626_OWNER_LOG=/var/log/fh8626-media-owner.log
+DIVINUS_LOG=/var/log/divinus.log
