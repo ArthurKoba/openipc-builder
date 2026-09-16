@@ -1,0 +1,16 @@
+config BR2_PACKAGE_MAJESTIC_FH8852V200_COMPAT
+	bool "Majestic FH8852V200 compatibility experiment"
+	depends on BR2_arm
+	depends on BR2_TOOLCHAIN_USES_MUSL
+	select BR2_PACKAGE_JSON_C
+	select BR2_PACKAGE_LIBEVENT_OPENIPC
+	select BR2_PACKAGE_LIBOGG_OPENIPC
+	select BR2_PACKAGE_LIBYAML
+	select BR2_PACKAGE_MBEDTLS_OPENIPC
+	select BR2_PACKAGE_OPUS_OPENIPC
+	help
+	  Experimental FH8852V200 Majestic userspace on FH8626V100.
+	  Installs no FH8852 kernel modules or firmware.
+	  FH8852 userspace libraries are isolated under
+	  /usr/lib/majestic-fh8852v200.
+	  Majestic is not started automatically.
