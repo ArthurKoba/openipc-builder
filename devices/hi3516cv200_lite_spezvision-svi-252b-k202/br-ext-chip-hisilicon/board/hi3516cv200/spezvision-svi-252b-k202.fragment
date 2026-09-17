@@ -1,0 +1,4 @@
+# BLK16CV-0323-38X38-V1.01 has no SD/MMC interface.
+# Disable HIMCI to avoid probing the absent controller during boot.
+# CONFIG_MMC is not set
+# CONFIG_HIMCI is not set
