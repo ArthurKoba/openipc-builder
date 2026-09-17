@@ -1,0 +1,2 @@
+# No removable storage on SVI-252B K202.
+# Keep the generic module loader quiet; vendor media modules are loaded by S70vendor.
