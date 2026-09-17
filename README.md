@@ -59,6 +59,7 @@ RunCam WiFiLink          SSC338Q      IMX415                     NOR_16M   done
 RVi-1NCMW2028 (2.8)      HI3516EV300  SC2330    RTL8188FU_USB    NAND      testing
 Smartwares CIP-37210     HI3518EV200  OV9732    RTL8188FU_USB    NOR_16M   done
 Smartwares CIP-37210AT   T21N         JXF37     RTL8188FU_USB    NOR_16M   done
+SpezVision SVI-252B K202 HI3516CV200  IMX323    -                NOR_8M    testing
 Switcam HS303 v1         HI3518EV200  JXF22     RTL8188FU_USB    NOR_16M   done
 Switcam HS303 v2         HI3518EV200  OV9732    RTL8188EU_USB    NOR_16M   done
 Tiandy TC-C321N          GK7205V200   OS02G10   -                NOR_8M    done
@@ -70,7 +71,7 @@ TP-Link Tapo C110 v1     SSC337       SC3335    SSW101B_USB      NOR_8M    done
 TP-Link Tapo C110 v2     SSC333       SC3338    SSW101B_USB      NOR_8M    done
 TP-Link Tapo C110 v26    SSC333       ?         ?                NOR_?     done
 TP-Link Tapo C310 v1     SSC325       SC3335    RTL8192EU_USB    NOR_8M    in progress
-TP-Link Tapo C310 v2.20  SSC335       SC3338    RTL8192EU_USB    NOR_8M    testing
+TP-Link Tapo C310 v2.20  SSC335       SC3338    RTL8188FU_USB    NOR_8M    testing
 TP-Link Tapo TC60 V5     T23N                   WQ9001_?         NOR_8M    **INIT** - frozen
 TP-Link Tapo TC70 V3     T31L         SC2336    RTL8188FU_USB    NOR_8M    done
 Trassir TR-D4121IR1 v2   HI3516CV200  AR0237    -                NOR_16M   done
