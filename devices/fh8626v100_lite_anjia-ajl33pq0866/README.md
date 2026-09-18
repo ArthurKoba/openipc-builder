@@ -11,7 +11,7 @@ Current audited staging directions:
 - Builder: `ArthurKoba/openipc-builder/work/fh8626v100-anjia` (record the exact HEAD from build provenance; this README is part of that branch);
 - Firmware core: `ArthurKoba/openipc-firmware/work/fh8626v100@80169887`;
 - Firmware Divinus: `ArthurKoba/openipc-firmware/work/fh8626v100-divinus@255b8c8d`;
-- Firmware Majestic: `ArthurKoba/openipc-firmware/work/fh8626v100-majestic@cf4c6c47`;
+- Firmware Majestic: `ArthurKoba/openipc-firmware/work/fh8626v100-majestic@aabf18a6`;
 - Linux: `ArthurKoba/openipc-linux/work/fh8626v100@357c2d13`;
 - Divinus: `ArthurKoba/openipc-divinus/work/fh8626v100` (record the exact source HEAD used by the matching Divinus build);
 - production U-Boot direction: `ArthurKoba/u-boot-fullhan/fh8626v100-mainline@7ac0aa7e`.
@@ -217,7 +217,7 @@ Before flashing a persistent image:
    `/usr/bin/load_fullhan`;
 7. boot non-destructively first where practical;
 8. prove media devices after `S70vendor`;
-9. run Majestic ABI probe and then `majestic-fh8626-full-run`;
+9. run Majestic ABI probe and require selected-library loading, Fullhan symbols, media devices and the complete FH8852-shaped sensor callback table to pass; then run `majestic-fh8626-full-run`;
 10. only after media acceptance proceed to persistent/update/U-Boot migration.
 
 All three named targets remain CI `NOT_BUILT` while these fork-local staging
