@@ -25,7 +25,7 @@ Current cross-repository staging inputs are:
 
 - Firmware core: `ArthurKoba/openipc-firmware/work/fh8626v100@eabd1ccd4684af6997771269c4655f7e4435bcec`;
 - Linux: `ArthurKoba/openipc-linux/work/fh8626v100@357c2d13e7589db0dbe2bbf89c2ec38b1c036e6e`;
-- Divinus implementation: `ArthurKoba/openipc-divinus/work/fh8626v100@1e624bd5aca97ba772413d2b00a10314d1db039f`.
+- Divinus implementation: `ArthurKoba/openipc-divinus/work/fh8626v100@f986a82f309b8794a5aae251589c6a5d07690c53`.
 
 The exact Linux tarball in the defconfig is a temporary engineering pin until
 the curated Linux series has an OpenIPC-owned ref.
@@ -39,6 +39,9 @@ The main target is:
 It selects Divinus plus the small
 `anjia-ajl33pq0866-divinus-config` package. The Divinus YAML is not in the
 shared device overlay, so it does not leak into other runtime directions.
+The current acceptance profile starts only the 1280x720@25 H.264 path. RTX
+audio and JPEG/MJPEG stay disabled by default until their separate package and
+target gates are exercised.
 
 The Majestic direction is maintained on
 `work/fh8626v100-anjia-majestic` as the separate named target
