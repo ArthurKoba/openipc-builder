@@ -1,5 +1,6 @@
-# ANJIA AJL33PQ0866 illumination defaults. Divinus writes validated runtime
-# overrides to /tmp/fh8626-illumination.conf.
+# ANJIA AJL33PQ0866 board illumination and IR-cut wiring.
+# Runtime day/night policy belongs to the selected media runtime; these values
+# describe only the physical board contract used by the low-level helper.
 FH8626_IRCUT_DAY_GPIO=18
 FH8626_IRCUT_NIGHT_GPIO=60
 FH8626_IRCUT_ACTIVE=1
