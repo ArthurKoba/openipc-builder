@@ -8,10 +8,10 @@ implementation is supplied by Divinus or the Majestic compatibility package.
 
 Current audited staging directions:
 
-- Builder: `ArthurKoba/openipc-builder/work/fh8626v100-anjia@e0060afb`;
+- Builder: `ArthurKoba/openipc-builder/work/fh8626v100-anjia` (record the exact HEAD from build provenance; this README is part of that branch);
 - Firmware core: `ArthurKoba/openipc-firmware/work/fh8626v100@80169887`;
 - Firmware Divinus: `ArthurKoba/openipc-firmware/work/fh8626v100-divinus@255b8c8d`;
-- Firmware Majestic: `ArthurKoba/openipc-firmware/work/fh8626v100-majestic@527e3d8b`;
+- Firmware Majestic: `ArthurKoba/openipc-firmware/work/fh8626v100-majestic@2d9ad60a`;
 - Linux: `ArthurKoba/openipc-linux/work/fh8626v100@357c2d13`;
 - Divinus: `ArthurKoba/openipc-divinus/work/fh8626v100@6860cb9b`;
 - production U-Boot direction: `ArthurKoba/u-boot-fullhan/fh8626v100-mainline@7ac0aa7e`.
@@ -98,9 +98,11 @@ Divinus own their current source/runtime paths independently.
 
 ## Majestic target
 
-The Majestic variant selects only
-`BR2_PACKAGE_MAJESTIC_FH8852V200_COMPAT` plus shared board/runtime packages.
-It does not install Divinus configuration.
+The Majestic variant selects `BR2_PACKAGE_MAJESTIC_FH8852V200_COMPAT` plus
+shared board packages. The compatibility package itself also selects
+`BR2_PACKAGE_FULLHAN_MEDIA_FH8626V100`, so the target cannot accidentally
+lose the required FH8626 kernel/ARC media runtime. It does not install Divinus
+configuration.
 
 Default boot remains the proven media-off Majestic control plane.
 
@@ -118,6 +120,14 @@ disabled and enables together:
 - recovered ANJIA day/night wiring.
 
 Majestic HTTP/WebUI remains native. There is no HTTP proxy or JavaScript patch.
+
+The FH8626 kernel/ARC media payload is immutable and SHA-256 pinned. The
+FH8852V200 Majestic executable is still downloaded from the upstream moving
+`majestic.fh8852v200.lite.master.tar.bz2` object. The first controlled build
+must therefore archive the exact installed Majestic SHA-256. ABI guards make
+an incompatible API expansion fail the build, but the moving donor remains a
+product-reproducibility blocker until an immutable donor or official FH8626
+Majestic build is available.
 
 ## Divinus target
 
