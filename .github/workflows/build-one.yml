@@ -8,8 +8,12 @@ on:
       commit:
         description: 'Builder commit SHA to build (optional; defaults to current branch HEAD). Use this from `git bisect run` or for one-off historic rebuilds.'
         required: false
+      firmware_repo:
+        description: 'Firmware repository to build.'
+        required: false
+        default: 'https://github.com/ArthurKoba/openipc-firmware.git'
       firmware_ref:
-        description: 'OpenIPC/firmware ref (SHA/tag/branch) to clone — for cross-repo bisect of size/regression issues. Defaults to firmware HEAD.'
+        description: 'Firmware ref (SHA/tag/branch). Defaults to repository HEAD.'
         required: false
       rebuild_packages:
         description: 'Comma-separated packages to rebuild from source while keeping the persistent Buildroot output.'
@@ -61,9 +65,21 @@ jobs:
           mkdir -p /runner/cache/ccache
           mkdir -p /runner/cache/buildroot-dl
           mkdir -p /runner/cache/buildroot-output
+          mkdir -p /runner/cache/git
           rm -rf "${HOME}/.ccache"
           ln -s /runner/cache/ccache "${HOME}/.ccache"
           echo "BR2_DL_DIR=/runner/cache/buildroot-dl" >> "${GITHUB_ENV}"
+
+          REMOTE='${{ inputs.firmware_repo }}'
+          KEY=$(printf '%s' "$REMOTE" | sha256sum | cut -c1-16)
+          MIRROR="/runner/cache/git/firmware-${KEY}.git"
+          if [ -d "$MIRROR" ]; then
+            git --git-dir="$MIRROR" remote set-url origin "$REMOTE"
+            git --git-dir="$MIRROR" remote update --prune
+          else
+            git clone --mirror "$REMOTE" "$MIRROR"
+          fi
+          echo "OPENIPC_FW_REPO=$MIRROR" >> "${GITHUB_ENV}"
 
       - name: Refresh moving-ref package downloads
         run: |
@@ -83,6 +99,7 @@ jobs:
           BUILD_SHA:      ${{ needs.resolve.outputs.ref }}
           BUILD_PLATFORM: ${{ inputs.platform }}
           OPENIPC_FW_REV: ${{ inputs.firmware_ref }}
+          OPENIPC_FW_REPO: ${{ env.OPENIPC_FW_REPO }}
           OPENIPC_OUTPUT_ROOT: /runner/cache/buildroot-output
           OPENIPC_REBUILD_PACKAGES: ${{ inputs.rebuild_packages }}
           OPENIPC_CLEAN_OUTPUT: ${{ inputs.clean_output }}
