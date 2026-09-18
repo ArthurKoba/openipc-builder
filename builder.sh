@@ -80,21 +80,27 @@ copy_to_archive() {
 }
 
 select_device() {
-    local path target
+    local target
     local -a menu=()
 
-    while IFS= read -r path; do
-        target=$(basename "$path" _defconfig)
+    while IFS= read -r target; do
         menu+=("$target" "")
-    done < <(find devices -name '*_defconfig' -print | sort)
+    done < <(
+        {
+            find devices -name '*_defconfig' -print |
+                while IFS= read -r path; do basename "$path" _defconfig; done
+            find devices -path '*/configs/variants/*.config' -print |
+                while IFS= read -r path; do basename "$path" .config; done
+        } | sort -u
+    )
 
     if [ "${#menu[@]}" -eq 0 ]; then
-        echo_c 31 "No device defconfigs found"
+        echo_c 31 "No device targets found"
         exit 2
     fi
 
     DEVICE=$(whiptail --title "Available devices" \
-        --menu "Please select a device from the list below:" 20 70 12 \
+        --menu "Please select a device from the list below:" 20 78 14 \
         "${menu[@]}" 3>&1 1>&2 2>&3)
     if [ $? != 0 ]; then
         echo_c 31 "Cancelled."
@@ -103,14 +109,51 @@ select_device() {
 }
 
 resolve_device() {
+    local total
     mapfile -t matches < <(find devices -name "${DEVICE}_defconfig" -print)
+    mapfile -t variants < <(find devices -path "*/configs/variants/${DEVICE}.config" -print)
+    total=$((${#matches[@]} + ${#variants[@]}))
 
-    if [ "${#matches[@]}" -ne 1 ]; then
-        echo_c 31 "Expected exactly one defconfig for ${DEVICE}, found ${#matches[@]}"
+    if [ "$total" -ne 1 ]; then
+        echo_c 31 "Expected exactly one target definition for ${DEVICE}, found $total"
         exit 2
     fi
 
-    ITEM=$(dirname "$(dirname "$(dirname "${matches[0]}")")")
+    VARIANT_SOURCE=
+    VARIANT_BASE=
+    VARIANT_OUTPUT=
+
+    if [ "${#matches[@]}" -eq 1 ]; then
+        ITEM=$(printf '%s\n' "${matches[0]}" | cut -d/ -f1,2)
+        return
+    fi
+
+    VARIANT_SOURCE="${variants[0]}"
+    ITEM=$(printf '%s\n' "$VARIANT_SOURCE" | cut -d/ -f1,2)
+    variant_dir=$(dirname "$VARIANT_SOURCE")
+    config_dir=$(dirname "$variant_dir")
+    VARIANT_BASE="$variant_dir/base.config"
+    VARIANT_OUTPUT="${config_dir#${ITEM}/}/${DEVICE}_defconfig"
+
+    if [ ! -f "$VARIANT_BASE" ]; then
+        echo_c 31 "Variant base is missing: $VARIANT_BASE"
+        exit 2
+    fi
+}
+
+compose_device_variant() {
+    [ -n "${VARIANT_SOURCE:-}" ] || return 0
+
+    output="${FIRMWARE_DIR}/${VARIANT_OUTPUT}"
+    mkdir -p "$(dirname "$output")" || return 1
+    {
+        cat "${BUILDER_DIR}/${VARIANT_BASE}"
+        printf '\n# Runtime variant: %s\n' "$DEVICE"
+        cat "${BUILDER_DIR}/${VARIANT_SOURCE}"
+    } > "$output" || return 1
+
+    # Builder-only composition metadata must not leak into the Firmware tree.
+    rm -rf -- "${FIRMWARE_DIR}/$(dirname "${VARIANT_OUTPUT}")/variants"
 }
 
 validate_build_environment() {
@@ -244,6 +287,9 @@ cp -afv "${BUILDER_DIR}/${ITEM}/." "$FIRMWARE_DIR/" || exit 1
 
 echo_c 33 "\nRegistering device-local packages"
 register_package_tree "${BUILDER_DIR}/${ITEM}/general/package" || exit 1
+
+echo_c 33 "\nComposing device runtime variant"
+compose_device_variant || exit 1
 
 cd "$FIRMWARE_DIR" || exit 1
 

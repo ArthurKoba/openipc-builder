@@ -20,3 +20,11 @@ config BR2_PACKAGE_ANJIA_AJL33PQ0866_TARGET_NAME
 	help
 	  Exact Builder target name embedded into the image for device-scoped
 	  update identity. Runtime direction defconfigs override this when needed.
+
+config BR2_PACKAGE_ANJIA_AJL33PQ0866_UPDATE_TARGET
+	string
+	default "fh8626v100_lite_anjia-ajl33pq0866_divinus"
+	depends on BR2_PACKAGE_ANJIA_AJL33PQ0866_BOARD_SUPPORT
+	help
+	  Builder release asset stem used for the persistent upgrade URL.
+	  Leave empty for diagnostic targets that must not change upgrade policy.

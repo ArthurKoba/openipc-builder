@@ -21,6 +21,8 @@ define ANJIA_AJL33PQ0866_BOARD_SUPPORT_INSTALL_TARGET_CMDS
 	$(INSTALL) -d -m 0755 $(TARGET_DIR)/etc/openipc
 	printf '%s\n' '$(call qstrip,$(BR2_PACKAGE_ANJIA_AJL33PQ0866_TARGET_NAME))' \
 		> $(TARGET_DIR)/etc/openipc/builder-target
+	printf '%s\n' '$(call qstrip,$(BR2_PACKAGE_ANJIA_AJL33PQ0866_UPDATE_TARGET))' \
+		> $(TARGET_DIR)/etc/openipc/update-target
 endef
 
 $(eval $(generic-package))
