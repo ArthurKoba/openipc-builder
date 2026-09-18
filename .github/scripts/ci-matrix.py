@@ -244,9 +244,10 @@ def classify(tree, changed, labels=(), event="pull_request", draft=False):
                              reason=f"{path} is in no directory CI builds")
 
         if PACKAGE_PATH.match(path):
-            # builder.sh copy_extra_packages() copies package/* into the
-            # firmware tree and appends every one to its Config.in, for every
-            # build. Nothing here is per-device.
+            # Root package/* is repository-wide by design: builder.sh copies
+            # it before every device overlay. Device-specific packages belong
+            # under devices/<dir>/general/package/, which is handled by the
+            # DEVICE_PATH branch above and therefore narrows normally.
             return _decision(full, True, reason=f"{path} is built into every device")
 
         # builder.sh itself, a new top-level file, or something this script has
@@ -385,6 +386,7 @@ def self_test():
     smoke = len(tree.smoke)
     common = len(tree.targets_in("devices/common"))
     apfpv = len(tree.targets_in("devices/apfpv"))
+    anjia = len(tree.targets_in("devices/fh8626v100_lite_anjia-ajl33pq0866"))
     cases = [
         # One device.
         (["devices/t31_lite_wyze-v3b/general/overlay/usr/share/openipc/customizer.sh"],
@@ -410,6 +412,9 @@ def self_test():
           "gk7205v200.generic-fpv.config"], 0, "a kernel config in an unbuilt device"),
         (["devices/t31_lite_xiaomi-mjsxj05hl/general/overlay/usr/share/"
           "openipc/customizer.sh"], 0, "an overlay file in an unbuilt device"),
+        (["devices/fh8626v100_lite_anjia-ajl33pq0866/general/package/"
+          "anjia-ajl33pq0866-board-support/Config.in"],
+         anjia, "a device-local package stays scoped to its device directory"),
         # A directory with no defconfig at all is still unknown, and unknown
         # still widens -- that is the half of this rule worth keeping.
         (["devices/a-device-that-does-not-exist/br-ext-chip-goke/board/x.config"],
