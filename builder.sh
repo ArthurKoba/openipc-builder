@@ -138,9 +138,20 @@ prepare_firmware_checkout() {
     cleanup_firmware_tmp
 
     if [ -n "${OPENIPC_FW_REV:-}" ]; then
+        local resolved_ref
+
         echo_c 33 "\nDownloading Firmware @ ${OPENIPC_FW_REV}"
         git clone "$FIRMWARE_REPO" "$FIRMWARE_TMP" || return 1
-        git -C "$FIRMWARE_TMP" checkout --detach "$OPENIPC_FW_REV" || return 1
+
+        resolved_ref="$OPENIPC_FW_REV"
+        if ! git -C "$FIRMWARE_TMP" rev-parse --verify "${resolved_ref}^{commit}" >/dev/null 2>&1; then
+            resolved_ref="origin/$OPENIPC_FW_REV"
+        fi
+        if ! git -C "$FIRMWARE_TMP" rev-parse --verify "${resolved_ref}^{commit}" >/dev/null 2>&1; then
+            git -C "$FIRMWARE_TMP" fetch --no-tags origin "$OPENIPC_FW_REV" || return 1
+            resolved_ref=FETCH_HEAD
+        fi
+        git -C "$FIRMWARE_TMP" checkout --detach "$resolved_ref" || return 1
     else
         echo_c 33 "\nDownloading Firmware"
         git clone --depth=1 "$FIRMWARE_REPO" "$FIRMWARE_TMP" || return 1
