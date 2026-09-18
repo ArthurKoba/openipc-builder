@@ -81,8 +81,14 @@ jobs:
           else
             git clone --mirror "$REMOTE" "$MIRROR"
           fi
+          OUTPUT_ROOT="/runner/cache/buildroot-output/${OUTPUT_KEY}"
+          LEGACY_OUTPUT="/runner/cache/buildroot-output/${{ inputs.platform }}"
+          mkdir -p "$OUTPUT_ROOT"
+          if [ -d "$LEGACY_OUTPUT" ] && [ ! -e "$OUTPUT_ROOT/${{ inputs.platform }}" ]; then
+            mv "$LEGACY_OUTPUT" "$OUTPUT_ROOT/${{ inputs.platform }}"
+          fi
           echo "OPENIPC_FW_REPO=$MIRROR" >> "${GITHUB_ENV}"
-          echo "OPENIPC_OUTPUT_ROOT=/runner/cache/buildroot-output/${OUTPUT_KEY}" >> "${GITHUB_ENV}"
+          echo "OPENIPC_OUTPUT_ROOT=$OUTPUT_ROOT" >> "${GITHUB_ENV}"
 
       - name: Refresh moving-ref package downloads
         run: |
