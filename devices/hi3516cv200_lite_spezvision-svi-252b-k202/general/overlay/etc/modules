@@ -1,2 +1,2 @@
-# No removable storage on SVI-252B K202.
-# Keep the generic module loader quiet; vendor media modules are loaded by S70vendor.
+# SVI-252B K202 has no removable storage.
+# Override OpenIPC's common /etc/modules (vfat, exfat), so S35modules loads nothing here.
