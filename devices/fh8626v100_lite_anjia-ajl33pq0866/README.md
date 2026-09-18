@@ -13,7 +13,7 @@ Current audited staging directions:
 - Firmware Divinus: `ArthurKoba/openipc-firmware/work/fh8626v100-divinus@255b8c8d`;
 - Firmware Majestic: `ArthurKoba/openipc-firmware/work/fh8626v100-majestic@cf4c6c47`;
 - Linux: `ArthurKoba/openipc-linux/work/fh8626v100@357c2d13`;
-- Divinus: `ArthurKoba/openipc-divinus/work/fh8626v100@44c4fb94`;
+- Divinus: `ArthurKoba/openipc-divinus/work/fh8626v100` (record the exact source HEAD used by the matching Divinus build);
 - production U-Boot direction: `ArthurKoba/u-boot-fullhan/fh8626v100-mainline@7ac0aa7e`.
 
 The exact Linux tarball remains pinned by commit in the Firmware defconfig.
