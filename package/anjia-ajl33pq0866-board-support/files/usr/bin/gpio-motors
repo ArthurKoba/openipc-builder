@@ -1,8 +1,8 @@
 #!/bin/sh
 
-# OpenIPC motor.cgi compatibility. FH8626 speed comes from the stock
-# pan_period/tilt_period board parameters; the generic delay argument is not
-# meaningful for the hardware PWM sequencer.
+# OpenIPC relative motor interface. FH8626 movement timing comes from the
+# hardware-PWM board parameters; DELAY_MS is accepted only for compatibility
+# with the standard gpio-motors command signature.
 if [ "$#" -ne 3 ]; then
     echo "usage: gpio-motors PAN_STEPS TILT_STEPS DELAY_MS" >&2
     exit 2
