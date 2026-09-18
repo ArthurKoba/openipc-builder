@@ -121,6 +121,7 @@ resolve_device() {
 
     VARIANT_SOURCE=
     VARIANT_BASE=
+    VARIANT_FIRMWARE_BASE=
     VARIANT_OUTPUT=
 
     if [ "${#matches[@]}" -eq 1 ]; then
@@ -133,20 +134,42 @@ resolve_device() {
     variant_dir=$(dirname "$VARIANT_SOURCE")
     config_dir=$(dirname "$variant_dir")
     VARIANT_BASE="$variant_dir/base.config"
+    firmware_base_file="$variant_dir/firmware-base"
     VARIANT_OUTPUT="${config_dir#${ITEM}/}/${DEVICE}_defconfig"
 
     if [ ! -f "$VARIANT_BASE" ]; then
         echo_c 31 "Variant base is missing: $VARIANT_BASE"
         exit 2
     fi
+    if [ ! -f "$firmware_base_file" ]; then
+        echo_c 31 "Firmware base selector is missing: $firmware_base_file"
+        exit 2
+    fi
+
+    IFS= read -r VARIANT_FIRMWARE_BASE < "$firmware_base_file"
+    case "$VARIANT_FIRMWARE_BASE" in
+        ""|/*|*..*)
+            echo_c 31 "Invalid Firmware base path: $VARIANT_FIRMWARE_BASE"
+            exit 2
+            ;;
+    esac
 }
 
 compose_device_variant() {
     [ -n "${VARIANT_SOURCE:-}" ] || return 0
 
     output="${FIRMWARE_DIR}/${VARIANT_OUTPUT}"
+    firmware_base="${FIRMWARE_DIR}/${VARIANT_FIRMWARE_BASE}"
+
+    if [ ! -f "$firmware_base" ]; then
+        echo_c 31 "Selected Firmware branch does not provide: $VARIANT_FIRMWARE_BASE"
+        return 1
+    fi
+
     mkdir -p "$(dirname "$output")" || return 1
     {
+        cat "$firmware_base"
+        printf '\n# Named-device delta: ANJIA AJL33PQ0866\n'
         cat "${BUILDER_DIR}/${VARIANT_BASE}"
         printf '\n# Runtime variant: %s\n' "$DEVICE"
         cat "${BUILDER_DIR}/${VARIANT_SOURCE}"
