@@ -99,7 +99,6 @@ jobs:
           BUILD_SHA:      ${{ needs.resolve.outputs.ref }}
           BUILD_PLATFORM: ${{ inputs.platform }}
           OPENIPC_FW_REV: ${{ inputs.firmware_ref }}
-          OPENIPC_FW_REPO: ${{ env.OPENIPC_FW_REPO }}
           OPENIPC_OUTPUT_ROOT: /runner/cache/buildroot-output
           OPENIPC_REBUILD_PACKAGES: ${{ inputs.rebuild_packages }}
           OPENIPC_CLEAN_OUTPUT: ${{ inputs.clean_output }}
