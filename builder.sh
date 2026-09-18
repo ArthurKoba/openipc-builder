@@ -160,8 +160,10 @@ fi
 
 sleep 3
 
-echo_c 33 "\nUpdating Builder"
-git pull
+if [ -z "${CI:-}" ]; then
+    echo_c 33 "\nUpdating Builder"
+    git pull
+fi
 
 # The source checkout is disposable. Heavy Buildroot state can live outside it
 # under OPENIPC_OUTPUT_ROOT, so removing this directory no longer throws away
