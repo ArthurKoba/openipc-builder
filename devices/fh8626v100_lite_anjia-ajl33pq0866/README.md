@@ -6,7 +6,9 @@ implementation is supplied by Divinus or Majestic.
 
 ## Repository boundary
 
-Builder owns only AJL33PQ0866 policy and assembly:
+Builder owns only AJL33PQ0866 policy and assembly. Its executable board
+support packages live under this device tree, so unrelated Builder targets do
+not even register them:
 
 - the board-only kernel fragment, including one-bit SD0 and this board's
   RTC/TSENSOR disable policy;
@@ -35,6 +37,13 @@ the curated Linux series has an OpenIPC-owned ref.
 The main target is:
 
 `fh8626v100_lite_anjia-ajl33pq0866`
+
+The board-support package embeds that exact target name in
+`/etc/openipc/builder-target`. The idempotent `S32anjia-env` service uses it
+to preserve runtime direction across self-update and only writes U-Boot
+environment values when they actually differ. The first-boot customizer merely
+invokes the same service, so correctness does not depend on one-shot
+`/etc/custom.ok` behavior.
 
 It selects Divinus plus the small
 `anjia-ajl33pq0866-divinus-config` package. The Divinus YAML is not in the

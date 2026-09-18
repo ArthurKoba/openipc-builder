@@ -94,3 +94,12 @@ white LED GPIO23 with the shared SADC1 pad, and the GPIO18/GPIO60 IR-cut
 actuator. It does not implement AUTO/DAY/NIGHT/WLIGHT media policy. The
 `S68anjia-hardware` init hook only establishes safe electrical outputs at boot
 and shutdown.
+
+
+## Device/update identity
+
+The package writes the selected named target to `/etc/openipc/builder-target`.
+`S32anjia-env` validates that marker on every NOR boot and keeps the
+board-qualified self-update URL and RTL8188FU profile synchronized without
+rewriting unchanged U-Boot environment variables. A TFTP/initramfs boot is
+explicitly read-only with respect to persistent U-Boot environment state.
