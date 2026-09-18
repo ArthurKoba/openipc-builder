@@ -9,7 +9,8 @@ FIRMWARE_TMP="${BUILDER_DIR}/.openipc.new.$"
 DEFAULT_FIRMWARE_REPO="https://github.com/OpenIPC/firmware.git"
 FIRMWARE_REPO="${OPENIPC_FW_REPO:-$DEFAULT_FIRMWARE_REPO}"
 TIMESTAMP=$(date +"%Y%m%d%H%M%S")
-VERSION=$(git -C "$BUILDER_DIR" rev-parse --short HEAD 2>/dev/null || stat -c"%Y" "$0")
+BUILDER_REV=$(git -C "$BUILDER_DIR" rev-parse HEAD 2>/dev/null || echo unknown)
+VERSION=$(printf '%s' "$BUILDER_REV" | cut -c1-12)
 
 cd "$BUILDER_DIR" || exit 1
 
@@ -80,6 +81,26 @@ copy_to_archive() {
     cp -a "${artifacts[@]}" "$archive_dir/" || return 1
     [ "${#size_reports[@]}" -eq 0 ] || cp -a "${size_reports[@]}" "$archive_dir/" || return 1
     [ "${#autoupdate[@]}" -eq 0 ] || cp -a "${autoupdate[@]}" "$archive_dir/" || return 1
+
+    if [ -f "${FIRMWARE_DIR}/output/openipc_defconfig" ]; then
+        cp -a "${FIRMWARE_DIR}/output/openipc_defconfig"             "$archive_dir/input.openipc_defconfig" || return 1
+    fi
+    if [ -f "${FIRMWARE_DIR}/output/.config" ]; then
+        cp -a "${FIRMWARE_DIR}/output/.config"             "$archive_dir/resolved.buildroot.config" || return 1
+    fi
+
+    {
+        printf 'target=%s\n' "$DEVICE"
+        printf 'built_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf 'builder_rev=%s\n' "$BUILDER_REV"
+        printf 'firmware_repo=%s\n' "$FIRMWARE_REPO"
+        printf 'firmware_requested_rev=%s\n' "${OPENIPC_FW_REV:-HEAD}"
+        printf 'firmware_resolved_rev=%s\n' "${FIRMWARE_RESOLVED_REV:-unknown}"
+        printf 'target_definition=%s\n' "${VARIANT_SOURCE:-classic-defconfig}"
+        if [ -f "$archive_dir/resolved.buildroot.config" ]; then
+            printf 'resolved_config_sha256=%s\n'                 "$(sha256sum "$archive_dir/resolved.buildroot.config" | awk '{print $1}')"
+        fi
+    } > "$archive_dir/build-info.txt" || return 1
 
     echo_c 35 "\nAssembled firmware available in:"
     tree -C "$archive_dir"
@@ -341,7 +362,8 @@ if [ "$FIRMWARE_DIR" != "${BUILDER_DIR}/openipc" ]; then
 fi
 
 prepare_firmware_checkout || exit 1
-echo_c 30 "Firmware revision: $(git -C "$FIRMWARE_DIR" rev-parse HEAD)"
+FIRMWARE_RESOLVED_REV=$(git -C "$FIRMWARE_DIR" rev-parse HEAD) || exit 1
+echo_c 30 "Firmware revision: $FIRMWARE_RESOLVED_REV"
 
 echo_c 33 "\nCopying extra packages"
 copy_extra_packages || exit 1
