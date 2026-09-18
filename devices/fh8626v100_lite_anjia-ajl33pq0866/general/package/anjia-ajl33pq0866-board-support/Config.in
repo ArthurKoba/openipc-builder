@@ -12,3 +12,11 @@ config BR2_PACKAGE_ANJIA_AJL33PQ0866_BOARD_SUPPORT
 	  The package deliberately does not calibrate or move PTZ at boot and does
 	  not persist inferred motor coordinates. Higher-level lens/media policy
 	  remains owned by the selected runtime.
+
+config BR2_PACKAGE_ANJIA_AJL33PQ0866_TARGET_NAME
+	string
+	default "fh8626v100_lite_anjia-ajl33pq0866"
+	depends on BR2_PACKAGE_ANJIA_AJL33PQ0866_BOARD_SUPPORT
+	help
+	  Exact Builder target name embedded into the image for device-scoped
+	  update identity. Runtime direction defconfigs override this when needed.

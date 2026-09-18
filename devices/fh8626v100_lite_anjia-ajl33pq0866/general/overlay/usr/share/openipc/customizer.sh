@@ -1,26 +1,51 @@
 #!/bin/sh
 #
 # ANJIA AJL33PQ0866 board profile.
-# Retail-board wiring/policy stays in this named profile. Timing-sensitive
-# GPIO5 dual-sensor sequencing is consumed by the media runtime around its
-# actual module/sensor startup rather than hidden in this first-boot script.
+# Timing-sensitive GPIO5 dual-sensor sequencing is consumed by the media
+# runtime around its actual module/sensor startup rather than hidden here.
 
-# TFTP validation runs from initramfs. Do not mutate the persistent U-Boot
-# environment until this profile is actually running from the NOR SquashFS.
-# Per-device serial#, cid, uuid and ethaddr values are deliberately preserved;
-# a shared firmware image must never replace device identity or MAC addresses.
+# TFTP/initramfs validation must not mutate persistent U-Boot state.
 grep -q ' / squashfs ' /proc/mounts || exit 0
 
-# Use the board-qualified release rather than the generic FH8626 image because
-# GPIO5 sequencing, dual GC1054 data and the RTL8188FU package are profile-owned.
-fw_setenv upgrade 'https://github.com/OpenIPC/builder/releases/download/latest/fh8626v100_lite_anjia-ajl33pq0866-nor.tgz'
-# Preserve ethaddr from each device instead of baking a development MAC into
-# the image. This device defconfig selects RTL8188FU, but keep the runtime
-# profile coupled to the package actually present in the composed image.
+TARGET_FILE=/etc/openipc/builder-target
+TARGET=$(cat "$TARGET_FILE" 2>/dev/null || true)
+
+case "$TARGET" in
+    fh8626v100_lite_anjia-ajl33pq0866|fh8626v100_lite_anjia-ajl33pq0866_majestic)
+        ;;
+    *)
+        echo "Invalid or missing Builder target identity: $TARGET" >&2
+        exit 1
+        ;;
+esac
+
+env_value()
+{
+    fw_printenv -n "$1" 2>/dev/null || true
+}
+
+set_env()
+{
+    key="$1"
+    value="$2"
+    [ "$(env_value "$key")" = "$value" ] || fw_setenv "$key" "$value"
+}
+
+clear_env()
+{
+    key="$1"
+    [ -z "$(env_value "$key")" ] || fw_setenv "$key"
+}
+
+# Keep the runtime direction stable across self-update.
+set_env upgrade "https://github.com/OpenIPC/builder/releases/download/latest/${TARGET}-nor.tgz"
+
+# Preserve serial#, cid, uuid and ethaddr. Only the Wi-Fi profile is device
+# policy, and avoid rewriting the environment when it already matches.
 if find /lib/modules -name 8188fu.ko -type f 2>/dev/null | grep -q .; then
-	fw_setenv wlandev rtl8188fu-generic
+    set_env wlandev rtl8188fu-generic
 else
-	fw_setenv wlandev
+    clear_env wlandev
 fi
 
 exit 0

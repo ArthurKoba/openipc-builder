@@ -18,6 +18,9 @@ define ANJIA_AJL33PQ0866_BOARD_SUPPORT_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/fh8626-lens \
 		$(TARGET_DIR)/usr/sbin/fh8626-lens
 	cp -a $(ANJIA_AJL33PQ0866_BOARD_SUPPORT_PKGDIR)/files/. $(TARGET_DIR)/
+	$(INSTALL) -d -m 0755 $(TARGET_DIR)/etc/openipc
+	printf '%s\n' '$(call qstrip,$(BR2_PACKAGE_ANJIA_AJL33PQ0866_TARGET_NAME))' \
+		> $(TARGET_DIR)/etc/openipc/builder-target
 endef
 
 $(eval $(generic-package))
