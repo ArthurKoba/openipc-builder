@@ -9,3 +9,5 @@
 /openipc
 /output
 __pycache__/
+.builder.lock
+.openipc.new.*

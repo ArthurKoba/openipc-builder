@@ -8,10 +8,16 @@ FIRMWARE_DIR="${BUILDER_DIR}/openipc"
 FIRMWARE_TMP="${BUILDER_DIR}/.openipc.new.$"
 DEFAULT_FIRMWARE_REPO="https://github.com/OpenIPC/firmware.git"
 FIRMWARE_REPO="${OPENIPC_FW_REPO:-$DEFAULT_FIRMWARE_REPO}"
-TIMESTAMP=$(date +"%Y%m%d%H%M")
-VERSION=$(stat -c"%Y" "$0")
+TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+VERSION=$(git -C "$BUILDER_DIR" rev-parse --short HEAD 2>/dev/null || stat -c"%Y" "$0")
 
 cd "$BUILDER_DIR" || exit 1
+
+exec 8>"$BUILDER_DIR/.builder.lock"
+if ! flock -n 8; then
+    echo "Another Builder run is already using $BUILDER_DIR" >&2
+    exit 2
+fi
 
 echo_c() {
     t="\e[1;$1m$2\e[0m" || t="$2"
@@ -89,7 +95,7 @@ select_device() {
         {
             find devices -name '*_defconfig' -print |
                 while IFS= read -r path; do basename "$path" _defconfig; done
-            find devices -path '*/configs/variants/*.config' -print |
+            find devices -path '*/configs/variants/*.config' ! -name base.config -print |
                 while IFS= read -r path; do basename "$path" .config; done
         } | sort -u
     )
@@ -111,7 +117,7 @@ select_device() {
 resolve_device() {
     local total
     mapfile -t matches < <(find devices -name "${DEVICE}_defconfig" -print)
-    mapfile -t variants < <(find devices -path "*/configs/variants/${DEVICE}.config" -print)
+    mapfile -t variants < <(find devices -path "*/configs/variants/${DEVICE}.config" ! -name base.config -print)
     total=$((${#matches[@]} + ${#variants[@]}))
 
     if [ "$total" -ne 1 ]; then
