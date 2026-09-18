@@ -35,3 +35,21 @@ integration is available from the Firmware source Builder consumes.
 The device is temporarily listed in Builder CI `NOT_BUILT` for the same cross-repository reason; remove that opt-out when the required Firmware base is available through the normal Builder clone.
 
 No build or hardware acceptance is implied by this source-only staging profile.
+
+## Runtime staging profiles
+
+The shared ANJIA board overlay can currently be built in two runtime directions:
+
+- `fh8626v100_lite_anjia-ajl33pq0866` — Divinus development profile.
+- `fh8626v100_lite_anjia-ajl33pq0866_majestic` — experimental Majestic control-plane profile.
+
+The Majestic profile must be built against the matching Firmware staging branch rather than upstream Firmware:
+
+```sh
+OPENIPC_FW_REPO=https://github.com/ArthurKoba/openipc-firmware.git
+OPENIPC_FW_REV=work/fh8626v100-majestic
+bash builder.sh fh8626v100_lite_anjia-ajl33pq0866_majestic
+```
+
+The Majestic branch intentionally ships media disabled. Historical target testing proved the FH8852V200 Majestic HTTP/WebUI control plane can run on FH8626V100, while the video/ISP capture path remains an unresolved compatibility task. Do not treat this profile as a completed camera runtime.
+
