@@ -85,7 +85,7 @@ validate_fh8626_image_budget() {
 }
 
 copy_to_archive() {
-    local archive_dir runtime_root runtime_manifest runtime_count path hash
+    local archive_dir runtime_root runtime_manifest runtime_count expected_runtime path hash
     local -a artifacts size_reports autoupdate archive_files
 
     if echo "${DEVICE}" | grep -q '^hi3518ev200_lite'; then
@@ -144,6 +144,15 @@ copy_to_archive() {
         printf '%s  %s\n' "$hash" "$path" >> "$runtime_manifest" || return 1
         runtime_count=$((runtime_count + 1))
     done
+    case "$DEVICE" in
+        fh8626v100_*_majestic) expected_runtime=10 ;;
+        fh8626v100_*) expected_runtime=9 ;;
+        *) expected_runtime=0 ;;
+    esac
+    if [ "$expected_runtime" -gt 0 ] && [ "$runtime_count" -ne "$expected_runtime" ]; then
+        echo_c 31 "FH8626 runtime provenance incomplete: found $runtime_count of $expected_runtime required files"
+        return 1
+    fi
     if [ "$runtime_count" -eq 0 ]; then
         rm -f "$runtime_manifest"
     fi
