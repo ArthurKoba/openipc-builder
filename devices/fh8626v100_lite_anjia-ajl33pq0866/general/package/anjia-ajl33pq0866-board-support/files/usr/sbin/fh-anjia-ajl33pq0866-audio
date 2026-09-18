@@ -1,0 +1,85 @@
+#!/bin/sh
+set -eu
+
+GPIO_CLASS=/sys/class/gpio
+PINCTRL=/proc/driver/pinctrl
+CONFIG=/etc/default/fh8626-audio
+
+[ -r "$CONFIG" ] || {
+    echo "ERROR: missing $CONFIG" >&2
+    exit 1
+}
+. "$CONFIG"
+
+case "$FH8626_SPEAKER_MUTE_GPIO:$FH8626_SPEAKER_MUTE_ACTIVE" in
+    *[!0-9:]*|'':*) exit 2 ;;
+esac
+[ "$FH8626_SPEAKER_MUTE_GPIO" -ge 0 ] && [ "$FH8626_SPEAKER_MUTE_GPIO" -le 127 ] || exit 2
+[ "$FH8626_SPEAKER_MUTE_ACTIVE" = 0 ] || [ "$FH8626_SPEAKER_MUTE_ACTIVE" = 1 ] || exit 2
+
+gpio_path()
+{
+    echo "$GPIO_CLASS/GPIO$1"
+}
+
+gpio_export()
+{
+    num="$1"
+    path="$(gpio_path "$num")"
+    [ -d "$path" ] || echo "$num" > "$GPIO_CLASS/export" 2>/dev/null || true
+    i=0
+    while [ ! -d "$path" ] && [ "$i" -lt 20 ]; do
+        sleep 0.01
+        i=$((i + 1))
+    done
+    [ -d "$path" ] || {
+        echo "ERROR: GPIO$num was not exported" >&2
+        return 1
+    }
+}
+
+select_gpio()
+{
+    [ -w "$PINCTRL" ] || return 0
+    echo "dev,GPIO$FH8626_SPEAKER_MUTE_GPIO,0,0" > "$PINCTRL"
+}
+
+set_mute()
+{
+    muted="$1"
+    gpio_export "$FH8626_SPEAKER_MUTE_GPIO"
+    select_gpio
+    echo low > "$(gpio_path "$FH8626_SPEAKER_MUTE_GPIO")/direction"
+    if [ "$muted" = 1 ]; then
+        value="$FH8626_SPEAKER_MUTE_ACTIVE"
+    else
+        value="$((1 - FH8626_SPEAKER_MUTE_ACTIVE))"
+    fi
+    echo "$value" > "$(gpio_path "$FH8626_SPEAKER_MUTE_GPIO")/value"
+}
+
+status()
+{
+    path="$(gpio_path "$FH8626_SPEAKER_MUTE_GPIO")"
+    if [ ! -d "$path" ]; then
+        echo "speaker_amp=unknown gpio=$FH8626_SPEAKER_MUTE_GPIO unexported"
+        return 0
+    fi
+    value="$(cat "$path/value")"
+    if [ "$value" = "$FH8626_SPEAKER_MUTE_ACTIVE" ]; then
+        state=mute
+    else
+        state=unmute
+    fi
+    echo "speaker_amp=$state gpio=$FH8626_SPEAKER_MUTE_GPIO value=$value active=$FH8626_SPEAKER_MUTE_ACTIVE"
+}
+
+case "${1:-}" in
+    mute|safe) set_mute 1 ;;
+    unmute) set_mute 0 ;;
+    status) status ;;
+    *)
+        echo "usage: $0 {mute|unmute|safe|status}" >&2
+        exit 2
+        ;;
+esac

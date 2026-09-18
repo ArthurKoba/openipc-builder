@@ -103,3 +103,22 @@ The package writes the selected named target to `/etc/openipc/builder-target`.
 board-qualified self-update URL and RTL8188FU profile synchronized without
 rewriting unchanged U-Boot environment variables. A TFTP/initramfs boot is
 explicitly read-only with respect to persistent U-Boot environment state.
+
+
+## Speaker amplifier mute
+
+The board package owns the physical speaker-amplifier mute on GPIO24, active
+high. This GPIO is separate from the FH8626 RTX audio transport.
+
+`fh-anjia-ajl33pq0866-audio` exposes only the physical board operation:
+
+```text
+fh-anjia-ajl33pq0866-audio mute
+fh-anjia-ajl33pq0866-audio unmute
+fh-anjia-ajl33pq0866-audio status
+```
+
+Boot, shutdown and board restart force the amplifier into the safe muted state.
+The selected media runtime must unmute only after AO is configured and must mute
+again before AO teardown. The generic FH8626 audio/RTX adapter must not contain
+AJL33PQ0866 GPIO policy.

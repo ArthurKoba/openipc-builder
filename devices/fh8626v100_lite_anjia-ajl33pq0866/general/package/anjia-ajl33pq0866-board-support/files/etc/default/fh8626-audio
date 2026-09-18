@@ -1,0 +1,6 @@
+# ANJIA AJL33PQ0866 speaker amplifier wiring.
+# GPIO24 is the hardware-proven independent amplifier mute, active high.
+# Audio runtimes own unmute timing around AO playback. Board boot/shutdown only
+# establishes the safe muted state.
+FH8626_SPEAKER_MUTE_GPIO=24
+FH8626_SPEAKER_MUTE_ACTIVE=1
