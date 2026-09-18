@@ -65,6 +65,7 @@ BR2_PACKAGE_DROPBEAR_OPENIPC_DISABLE_REVERSEDNS=y
 BR2_PACKAGE_HAVEGED=y
 BR2_PACKAGE_ANJIA_AJL33PQ0866_BOARD_SUPPORT=y
 BR2_PACKAGE_DIVINUS=y
+BR2_PACKAGE_ANJIA_AJL33PQ0866_DIVINUS_CONFIG=y
 BR2_PACKAGE_IPCTOOL=y
 # ipctool is intentionally shipped as the standard OpenIPC extutils wrapper:
 # it downloads the current upstream binary on first use instead of freezing a

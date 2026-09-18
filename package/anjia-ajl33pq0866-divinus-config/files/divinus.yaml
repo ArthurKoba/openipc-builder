@@ -1,5 +1,4 @@
 source:
-  # Native FH8626V100 HAL owns sensor/ISP/VENC directly.
   type: sdk
 
 system:
@@ -26,8 +25,6 @@ mdns:
   enable: false
 onvif:
   enable: true
-  # Frigate may send these credentials. Authentication remains disabled for
-  # compatibility with clients that only support discovery without WSSE.
   enable_auth: false
   auth_user: admin
   auth_pass: 12345
@@ -46,12 +43,14 @@ record:
   filename:
   segment_duration: 300
   segment_size: 0
+
 stream:
   enable: false
 night_mode:
   enable: false
 http_post:
   enable: false
+
 audio:
   enable: true
   bitrate: 32
@@ -74,6 +73,7 @@ jpeg:
   width: 640
   height: 384
   qfactor: 75
+
 mjpeg:
   enable: true
   mode: CBR

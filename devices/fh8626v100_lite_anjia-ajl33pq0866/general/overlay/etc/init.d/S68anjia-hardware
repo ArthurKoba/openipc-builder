@@ -1,0 +1,22 @@
+#!/bin/sh
+
+HELPER=/usr/sbin/fh-anjia-ajl33pq0866-light
+
+safe()
+{
+    "$HELPER" safe || logger -p daemon.err -t anjia-board \
+        "failed to place illumination outputs in safe state"
+}
+
+case "${1:-start}" in
+    start|stop)
+        safe
+        ;;
+    restart)
+        safe
+        ;;
+    *)
+        echo "usage: $0 {start|stop|restart}" >&2
+        exit 2
+        ;;
+esac

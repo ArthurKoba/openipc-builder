@@ -1,0 +1,10 @@
+config BR2_PACKAGE_ANJIA_AJL33PQ0866_DIVINUS_CONFIG
+	bool "anjia-ajl33pq0866-divinus-config"
+	depends on BR2_PACKAGE_DIVINUS
+	help
+	  Divinus runtime defaults for the ANJIA AJL33PQ0866 named device.
+
+	  This package contains no FH8626 implementation code. It exists only so
+	  the Divinus target can install its device-specific /etc/divinus.yaml
+	  without leaking that runtime configuration into the shared ANJIA overlay
+	  or the Majestic target.

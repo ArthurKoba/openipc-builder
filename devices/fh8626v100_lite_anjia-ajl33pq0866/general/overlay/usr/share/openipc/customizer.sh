@@ -1,8 +1,9 @@
 #!/bin/sh
 #
 # ANJIA AJL33PQ0866 board profile.
-# Hardware-specific media GPIO sequencing is provided by the board package,
-# not by the generic FH8626V100 module loader.
+# Retail-board wiring/policy stays in this named profile. Timing-sensitive
+# GPIO5 dual-sensor sequencing is consumed by the media runtime around its
+# actual module/sensor startup rather than hidden in this first-boot script.
 
 # TFTP validation runs from initramfs. Do not mutate the persistent U-Boot
 # environment until this profile is actually running from the NOR SquashFS.

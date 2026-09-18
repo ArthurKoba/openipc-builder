@@ -24,10 +24,14 @@ config), e.g. `hi3518ev200_lite_switcam-hs303`. It is passed straight through as
 `make BOARD=<device>`. There is no separate test/lint suite — "passing" means the firmware
 image builds and (ideally) boots on hardware.
 
+`builder.sh` builds the checked-out Builder revision exactly as invoked. It does not
+self-update with `git pull`; update or switch Builder revisions explicitly before starting
+a build.
+
 What `builder.sh <device>` does, in order:
-1. `git pull` (self-update the builder repo).
-2. `rm -rf openipc` then clone `OpenIPC/firmware` — HEAD by default, or the ref in
-   `$OPENIPC_FW_REV` if set (used for cross-repo bisects; see build-one.yml).
+1. Resolve exactly one matching device defconfig and validate the host `PATH` for Buildroot.
+2. Remove only the local `openipc/` worktree, then clone `OpenIPC/firmware` — HEAD by default,
+   or the repository/ref selected by `$OPENIPC_FW_REPO` and `$OPENIPC_FW_REV`.
 3. `copy_extra_packages` — copy `package/*` into `openipc/general/package/` and append a
    `source "...Config.in"` line for each into the external tree's `Config.in`.
 4. Copy `devices/<device>/*` over the firmware tree (defconfig, overlay, excludes, board).
