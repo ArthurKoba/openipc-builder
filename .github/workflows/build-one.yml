@@ -39,7 +39,7 @@ jobs:
   buildroot:
     name: Firmware (${{inputs.platform}})
     needs: resolve
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, openipc-builder]
 
     steps:
       - name: Checkout source
@@ -47,25 +47,13 @@ jobs:
         with:
           ref: ${{ needs.resolve.outputs.ref }}
 
-      - name: Prepare firmware
+      - name: Prepare persistent local caches
         run: |
-          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
-          echo CACHE_DATE=$(date +%m) >> ${GITHUB_ENV}
-
-      - name: Setup ccache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/ccache
-          key: ${{inputs.platform}}-${{env.CACHE_DATE}}
-
-      # See master.yml for the rationale — builder.sh rm -rf's openipc/
-      # every run, so dl/ has to live outside via BR2_DL_DIR.
-      - name: Setup dl cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/builder-dl
-          key: builder-dl-${{env.CACHE_DATE}}
-          restore-keys: builder-dl-
+          mkdir -p /runner/cache/ccache
+          mkdir -p /runner/cache/buildroot-dl
+          rm -rf "${HOME}/.ccache"
+          ln -s /runner/cache/ccache "${HOME}/.ccache"
+          echo "BR2_DL_DIR=/runner/cache/buildroot-dl" >> "${GITHUB_ENV}"
 
       - name: Refresh moving-ref package downloads
         run: |
@@ -75,7 +63,7 @@ jobs:
           # Covers both the dash form (<pkg>-<ref>.tar.gz, e.g. majestic-webui-dist) and
           # the dot form (<pkg>.<ref>.tar.bz2, e.g. majestic.t31.lite.master from S3 —
           # a moving build with no .hash, NOT a content-addressed pin).
-          find /tmp/builder-dl -type f -regextype posix-extended \
+          find /runner/cache/buildroot-dl -type f -regextype posix-extended \
             -regex '.*[-.](HEAD|master|main|dist)\.tar\.(gz|bz2|xz)' \
             -print -delete 2>/dev/null || true
 
@@ -91,11 +79,9 @@ jobs:
           echo GIT_HASH=${GIT_HASH} >> ${GITHUB_ENV}
           echo GIT_BRANCH=${GIT_BRANCH} >> ${GITHUB_ENV}
 
-          mkdir -p /tmp/ccache
-          ln -s /tmp/ccache ${HOME}/.ccache
-
-          mkdir -p /tmp/builder-dl
-          export BR2_DL_DIR=/tmp/builder-dl
+          mkdir -p /runner/cache/ccache
+          mkdir -p /runner/cache/buildroot-dl
+          export BR2_DL_DIR=/runner/cache/buildroot-dl
 
           NAME=${{inputs.platform}}
           # Retry budget for transient upstream toolchain/CDN flakes
