@@ -66,6 +66,7 @@ NOT_BUILT = {
     # Cross-repository staging: its generic FH8626 Firmware base is not in
     # OpenIPC/firmware yet, so the normal Builder clone cannot build it.
     "fh8626v100_lite_anjia-ajl33pq0866",
+    "fh8626v100_lite_anjia-ajl33pq0866_majestic",
     "gk7102ca_lite_umea-qc01x", "gk7102ca_lite_vstarcam-g8896wip",
     "gk7205v200_rubyfpv_generic", "hi3518ev200_lite_lenovo-snowman-1080p",
     "t31_lite_xiaomi-mjsxj05hl",
