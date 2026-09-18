@@ -111,6 +111,38 @@ copy_extra_packages() {
     done
 }
 
+setup_persistent_output() {
+    if [ -z "${OPENIPC_OUTPUT_ROOT:-}" ]; then
+        return
+    fi
+
+    local output_dir="${OPENIPC_OUTPUT_ROOT}/${DEVICE}"
+    if [ "${OPENIPC_CLEAN_OUTPUT:-false}" = "true" ]; then
+        echo_c 33 "\nClearing persistent build output for ${DEVICE}"
+        rm -rf "$output_dir"
+    fi
+
+    mkdir -p "$output_dir"
+    rm -rf "${FIRMWARE_DIR}/output"
+    ln -s "$output_dir" "${FIRMWARE_DIR}/output"
+    echo_c 32 "\nUsing persistent build output: ${output_dir}"
+
+    if [ -n "${OPENIPC_REBUILD_PACKAGES:-}" ]; then
+        local package
+        local -a packages
+        IFS=',' read -r -a packages <<< "${OPENIPC_REBUILD_PACKAGES}"
+        for package in "${packages[@]}"; do
+            package=$(echo "$package" | xargs)
+            [ -n "$package" ] || continue
+            echo_c 33 "Forcing package rebuild: ${package}"
+            if [ -d "$output_dir/build" ]; then
+                find "$output_dir/build" -maxdepth 1 -mindepth 1 -type d -name "${package}-*" -print -exec rm -rf {} +
+            fi
+            rm -rf "$output_dir/per-package/$package"
+        done
+    fi
+}
+
 echo_c 37 "Experimental system for building OpenIPC firmware for known devices"
 echo_c 30 "https://openipc.org/"
 echo_c 30 "Version: ${VERSION}"
@@ -126,6 +158,9 @@ sleep 3
 echo_c 33 "\nUpdating Builder"
 git pull
 
+# The source checkout is disposable. Heavy Buildroot state can live outside it
+# under OPENIPC_OUTPUT_ROOT, so removing this directory no longer throws away
+# toolchains, package build state, ccache, or downloaded tarballs.
 rm -rf openipc
 # OPENIPC_FW_REV pins firmware to a specific ref (branch, tag, or SHA) for
 # cross-repo bisect of size/regression issues — set by build-one.yml's
