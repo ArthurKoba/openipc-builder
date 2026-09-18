@@ -122,6 +122,7 @@ resolve_device() {
     VARIANT_SOURCE=
     VARIANT_BASE=
     VARIANT_FIRMWARE_BASE=
+    VARIANT_FIRMWARE_META=
     VARIANT_OUTPUT=
 
     if [ "${#matches[@]}" -eq 1 ]; then
@@ -135,6 +136,7 @@ resolve_device() {
     config_dir=$(dirname "$variant_dir")
     VARIANT_BASE="$variant_dir/base.config"
     firmware_base_file="$variant_dir/firmware-base"
+    VARIANT_FIRMWARE_META="$variant_dir/${DEVICE}.firmware"
     VARIANT_OUTPUT="${config_dir#${ITEM}/}/${DEVICE}_defconfig"
 
     if [ ! -f "$VARIANT_BASE" ]; then
@@ -184,6 +186,37 @@ validate_build_environment() {
         echo_c 31 "PATH contains whitespace; Buildroot cannot reliably use this environment."
         echo_c 31 "Remove Windows/WSL PATH entries with spaces and retry."
         exit 2
+    fi
+}
+
+apply_variant_firmware_source() {
+    local key value meta_repo= meta_rev=
+
+    [ -n "${VARIANT_FIRMWARE_META:-}" ] || return 0
+    [ -f "$VARIANT_FIRMWARE_META" ] || return 0
+
+    while IFS='=' read -r key value; do
+        case "$key" in
+            repo) meta_repo="$value" ;;
+            rev) meta_rev="$value" ;;
+            ""|'#'*) ;;
+            *)
+                echo_c 31 "Unknown variant Firmware metadata key: $key"
+                exit 2
+                ;;
+        esac
+    done < "$VARIANT_FIRMWARE_META"
+
+    if [ -z "$meta_repo" ] || [ -z "$meta_rev" ]; then
+        echo_c 31 "Incomplete variant Firmware metadata: $VARIANT_FIRMWARE_META"
+        exit 2
+    fi
+
+    if [ -z "${OPENIPC_FW_REPO:-}" ]; then
+        FIRMWARE_REPO="$meta_repo"
+    fi
+    if [ -z "${OPENIPC_FW_REV:-}" ]; then
+        OPENIPC_FW_REV="$meta_rev"
     fi
 }
 
@@ -284,6 +317,7 @@ while [ -z "${DEVICE}" ]; do
 done
 
 resolve_device
+apply_variant_firmware_source
 validate_build_environment
 validate_firmware_source
 validate_device_packages
@@ -291,6 +325,7 @@ validate_device_packages
 trap cleanup_firmware_tmp EXIT
 
 echo_c 31 "\nStarting a device for ${DEVICE}"
+echo_c 30 "Firmware source: ${FIRMWARE_REPO}${OPENIPC_FW_REV:+ @ ${OPENIPC_FW_REV}}"
 tree -C "${ITEM}"
 
 # Build exactly the checked-out Builder revision. Do not mutate this checkout.

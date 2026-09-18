@@ -130,6 +130,7 @@ GITHUB_SCRIPT = re.compile(r"^\.github/scripts/([^/]+)$")
 DEVICE_PATH = re.compile(r"^devices/([^/]+)/(.*)$")
 DEVICE_DEFCONFIG = re.compile(r"^devices/[^/]+/.*/configs/(.+)_defconfig$")
 DEVICE_VARIANT = re.compile(r"^devices/[^/]+/.*/configs/variants/(.+)\.config$")
+DEVICE_VARIANT_META = re.compile(r"^devices/[^/]+/.*/configs/variants/(.+)\.firmware$")
 PACKAGE_PATH = re.compile(r"^package/([^/]+)/")
 
 FULL_LABEL = "ci:full"
@@ -252,6 +253,11 @@ def classify(tree, changed, labels=(), event="pull_request", draft=False):
             if variant and variant.group(1) != "base":
                 if variant.group(1) in tree.built:
                     targets.add(variant.group(1))
+                continue
+            variant_meta = DEVICE_VARIANT_META.match(path)
+            if variant_meta:
+                if variant_meta.group(1) in tree.built:
+                    targets.add(variant_meta.group(1))
                 continue
             hits = tree.targets_in(f"devices/{device.group(1)}")
             if hits:
