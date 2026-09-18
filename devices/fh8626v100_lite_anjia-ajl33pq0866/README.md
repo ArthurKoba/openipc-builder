@@ -68,7 +68,7 @@ metadata automatically, so the normal staging commands are simply:
 `OPENIPC_FW_REPO` / `OPENIPC_FW_REV` remain explicit overrides for bisect
 or debugging; they are not required for these three named variants.
 
-The composed config and source provenance are archived with a successful build. Builder now also writes `runtime-sha256.txt`, records `majestic_sha256` in `build-info.txt`, and emits archive-level `SHA256SUMS`, so the moving Majestic donor and the pinned FH8626 runtime bytes are attributable to the exact image.
+The composed config and source provenance are archived with a successful build. Builder now also writes `runtime-sha256.txt`, records `majestic_sha256` in `build-info.txt`, and emits archive-level `SHA256SUMS`, so the moving Majestic donor and the pinned FH8626 runtime bytes are attributable to the exact image. FH8626 archive creation is strict: Majestic requires all 10 provenance entries (Majestic plus the nine media/ARC payloads), while Divinus/diag require all nine shared media/ARC payloads.
 
 ## Shared proprietary media kernel runtime
 
