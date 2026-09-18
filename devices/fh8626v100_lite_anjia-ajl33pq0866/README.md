@@ -34,32 +34,70 @@ the curated Linux series has an OpenIPC-owned ref.
 
 ## Runtime targets
 
-The main target is:
+ANJIA uses composed runtime variants instead of copied full defconfigs.
 
-`fh8626v100_lite_anjia-ajl33pq0866`
+Shared Buildroot/device selections live once in:
 
-The board-support package embeds that exact target name in
-`/etc/openipc/builder-target`. The idempotent `S32anjia-env` service uses it
-to preserve runtime direction across self-update and only writes U-Boot
-environment values when they actually differ. The first-boot customizer merely
-invokes the same service, so correctness does not depend on one-shot
-`/etc/custom.ok` behavior.
+`br-ext-chip-fullhan/configs/variants/base.config`
 
-It selects Divinus plus the small
-`anjia-ajl33pq0866-divinus-config` package. The Divinus YAML is not in the
-shared device overlay, so it does not leak into other runtime directions.
-The current acceptance profile starts only the 1280x720@25 H.264 path. RTX
-audio and JPEG/MJPEG stay disabled by default until their separate package and
-target gates are exercised.
+Each selectable target has a short fragment beside it:
 
-The Majestic direction is maintained on
-`work/fh8626v100-anjia-majestic` as the separate named target
-`fh8626v100_lite_anjia-ajl33pq0866_majestic`. Its implementation package stays
-in Firmware; Builder only selects that Firmware direction and applies this same
-board policy.
+- `fh8626v100_lite_anjia-ajl33pq0866_divinus.config` — Divinus development/runtime;
+- `fh8626v100_lite_anjia-ajl33pq0866_majestic.config` — experimental Majestic compatibility runtime;
+- `fh8626v100_lite_anjia-ajl33pq0866_diag.config` — streamer-free board diagnostics for PTZ, lens, illumination, storage and networking.
 
-Both targets remain in CI `NOT_BUILT` while their required FH8626 Firmware
-refs are fork-local.
+`builder.sh` discovers these fragments as normal selectable targets, composes
+`base.config + <target>.config` into the Firmware checkout, and removes the
+Builder-only composition metadata before invoking Firmware. No GPIO, Wi-Fi,
+microSD, kernel fragment, PTZ backend or illumination file is copied between
+runtime variants.
+
+Build the current staging directions explicitly:
+
+```sh
+OPENIPC_FW_REPO=https://github.com/ArthurKoba/openipc-firmware.git
+OPENIPC_FW_REV=work/fh8626v100-divinus
+./builder.sh fh8626v100_lite_anjia-ajl33pq0866_divinus
+```
+
+```sh
+OPENIPC_FW_REPO=https://github.com/ArthurKoba/openipc-firmware.git
+OPENIPC_FW_REV=work/fh8626v100-majestic
+./builder.sh fh8626v100_lite_anjia-ajl33pq0866_majestic
+```
+
+```sh
+OPENIPC_FW_REPO=https://github.com/ArthurKoba/openipc-firmware.git
+OPENIPC_FW_REV=work/fh8626v100
+./builder.sh fh8626v100_lite_anjia-ajl33pq0866_diag
+```
+
+The Divinus fragment selects Divinus plus the small
+`anjia-ajl33pq0866-divinus-config` package. Its current acceptance YAML starts
+only the 1280x720@25 H.264 path; RTX audio and JPEG/MJPEG remain disabled until
+their own gates pass.
+
+The Majestic fragment selects only the Firmware-owned
+`BR2_PACKAGE_MAJESTIC_FH8852V200_COMPAT` compatibility package. No Divinus
+configuration is installed.
+
+The diagnostic fragment selects no streamer at all. It intentionally keeps the
+shared board-support package so low-level board functions can be exercised
+without a media owner. It has no update target, so a NOR diagnostic boot does
+not replace the camera's persistent self-update direction.
+
+Each runtime image embeds its exact target in `/etc/openipc/builder-target`.
+Normal runtime variants also embed `/etc/openipc/update-target`.
+`S32anjia-env` validates these values on every NOR boot and only changes U-Boot
+environment variables when needed. TFTP/initramfs validation never mutates the
+persistent environment.
+
+All three targets remain explicit CI `NOT_BUILT` entries while their required
+FH8626 Firmware directions are fork-local.
+
+The former separate Builder Majestic branch was retired after this composition
+model landed. Its pre-consolidation state is preserved only as
+`archive/fh8626v100-anjia-majestic-branch-20260918`.
 
 ## PTZ
 
@@ -122,10 +160,10 @@ already mounted and syncs/unmounts it on shutdown.
 sets the board-qualified update URL and the RTL8188FU runtime profile only when
 the module is actually present.
 
-The full named-device defconfig still repeats architecture/toolchain/kernel
-selection because Builder overlays complete Buildroot defconfigs. Those lines
-select the shared Firmware/Linux implementation; they are not copies of generic
-FH8626 source.
+The composed base still contains architecture/toolchain/kernel selection
+because Firmware expects a complete Buildroot defconfig after composition.
+Those lines select the shared Firmware/Linux implementation; streamer-specific
+choices are not repeated there.
 
 ## Validation state
 
@@ -135,8 +173,8 @@ acceptance.
 
 Remaining owner gates are:
 
-- build both named targets against their exact Firmware directions and record
-  the resolved config plus kernel/rootfs sizes;
+- build all three composed targets against their exact Firmware directions and
+  record the resolved config plus kernel/rootfs sizes;
 - cold-boot GPIO5 dual-sensor bootstrap and WIDE/TELE switching;
 - relative pan/tilt direction, requested delay/speed, cancellation and safe
   output disable with no boot movement;

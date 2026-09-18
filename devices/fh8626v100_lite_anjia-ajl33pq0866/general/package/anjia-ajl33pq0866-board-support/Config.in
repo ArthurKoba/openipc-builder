@@ -15,7 +15,7 @@ config BR2_PACKAGE_ANJIA_AJL33PQ0866_BOARD_SUPPORT
 
 config BR2_PACKAGE_ANJIA_AJL33PQ0866_TARGET_NAME
 	string
-	default "fh8626v100_lite_anjia-ajl33pq0866"
+	default "fh8626v100_lite_anjia-ajl33pq0866_divinus"
 	depends on BR2_PACKAGE_ANJIA_AJL33PQ0866_BOARD_SUPPORT
 	help
 	  Exact Builder target name embedded into the image for device-scoped

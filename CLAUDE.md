@@ -29,16 +29,18 @@ self-update with `git pull`; update or switch Builder revisions explicitly befor
 a build.
 
 What `builder.sh <device>` does, in order:
-1. Resolve exactly one matching device defconfig, validate the host `PATH`, and validate
-   device-local package names before doing network/build work.
+1. Resolve exactly one target definition: either a conventional `*_defconfig` or a
+   composed `configs/variants/<target>.config`. Validate the host `PATH` and device-local
+   package names before doing network/build work.
 2. Clone Firmware into a temporary sibling checkout and replace `openipc/` only after the
    requested ref resolves successfully. Upstream HEAD is the default. A non-upstream
    `$OPENIPC_FW_REPO` is accepted only together with an explicit `$OPENIPC_FW_REV`.
 3. `copy_extra_packages` copies repository-wide `package/*` into
    `openipc/general/package/`. These packages intentionally affect every Builder target.
-4. Copy `devices/<device>/*` over the firmware tree, then register any
-   `devices/<device>/general/package/*` packages. Device-local packages therefore exist
-   only for that named device and do not widen unrelated builds.
+4. Copy the owning `devices/<dir>/*` tree over Firmware, register any
+   `devices/<dir>/general/package/*` packages, and, for a composed target, write one
+   generated `<target>_defconfig` from `base.config + <target>.config`. Builder-only
+   variant metadata is removed from the Firmware checkout before the build.
 5. `make BOARD=<device>` then best-effort `make BOARD=<device> size-report`.
 6. `copy_to_archive` → `archive/<device>/<timestamp>/`. For `hi3518ev200_lite` it also runs
    `autoup_rootfs` to wrap the images as `autoupdate-*.img` via `mkimage`.
@@ -59,12 +61,17 @@ Device directory names encode `<soc>_<flavor>_<vendor>-<model>[-<version>]`:
 - **flavor** — firmware track: `lite` (default, the vast majority), `ultimate`, `fpv`,
   `rubyfpv`, `apfpv`. Prefer `lite` for new devices unless flash size forces otherwise.
 
-The minimal required files for a registered device (per README "Requirements"):
+The normal minimal registration remains a conventional
+`devices/<device>/br-ext-chip-<vendor>/configs/<device>_defconfig`.
+For one physical device with several runtime directions, prefer a composed layout instead:
+
 ```
-devices/<device>/br-ext-chip-<vendor>/configs/<device>_defconfig
-devices/<device>/general/overlay/usr/share/openipc/customizer.sh
-devices/<device>/general/scripts/excludes/<soc>_<flavor>.list
+devices/<dir>/br-ext-chip-<vendor>/configs/variants/base.config
+devices/<dir>/br-ext-chip-<vendor>/configs/variants/<target-a>.config
+devices/<dir>/br-ext-chip-<vendor>/configs/variants/<target-b>.config
 ```
+
+Common device overlay/excludes/packages stay once under `devices/<dir>/general/`.
 - **`br-ext-chip-<vendor>/`** — the chip-vendor folder mirrors firmware's `BR2_EXTERNAL`
   layout. One of: `br-ext-chip-hisilicon`, `br-ext-chip-sigmastar`, `br-ext-chip-goke`,
   `br-ext-chip-ingenic` (Ingenic = the T-series SoCs). The defconfig inside selects
@@ -125,8 +132,8 @@ size first (the README device table lists all of these for existing boards).
    `.ini`), or a custom kernel config at `br-ext-chip-<vendor>/board/<family>/<soc>.generic.config`.
    Keep the file count minimal — anything reusable belongs upstream in `OpenIPC/firmware`.
 6. **CI registration is automatic — there is nothing to add.** The build matrix is derived
-   from the tree by `.github/scripts/ci-matrix.py`: a device is registered by having
-   `devices/<dir>/.../<dir>_defconfig`, full stop. Do **not** add the device to
+   from conventional `*_defconfig` files and composed
+   `configs/variants/<target>.config` targets. Do **not** add the device to
    `.github/workflows/master.yml` — it holds no device list, and a PR that adds one is just a
    merge conflict. The only written-down list is `NOT_BUILT` in `ci-matrix.py`, the opt-out
    for devices that exist but are deliberately not built; leave it alone unless you mean to

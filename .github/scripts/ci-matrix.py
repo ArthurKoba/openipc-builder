@@ -14,10 +14,12 @@ packages, builder.sh, and anything this script has never heard of all widen back
 out to the full matrix. Getting the classification wrong therefore costs runner
 time, never coverage.
 
-The device -> files mapping is not written down here, it is read off the tree
-the same way builder.sh reads it. builder.sh resolves exactly one matching <device>_defconfig, derives its
-devices/<dir>/ root, and copies that WHOLE directory over the firmware clone. So the devices a file affects are exactly the
-devices whose defconfig lives in the same directory. That matters: devices/common/
+The target -> files mapping is read off the tree the same way builder.sh reads
+it. A target is either a conventional *_defconfig or a composed
+configs/variants/<target>.config. Builder resolves its owning devices/<dir> and
+copies that whole device layer over Firmware. A concrete variant fragment affects
+only that target; base.config and the rest of the device tree affect every target
+owned by the directory. That matters: devices/common/
 holds 18 targets and devices/apfpv/ holds 2, and treating either as one device
 would skip 17 real builds.
 
@@ -58,9 +60,10 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 # boards are not the product -- so the list is explicit and NOT_BUILT would be
 # noise. Here devices are the product and the list is just "all of them".
 
-# Devices that exist in the tree but are deliberately not built: the opt-out
-# from the rule above. Every entry must still have a defconfig, so a rename
-# leaves a name describing nothing and --self-test says so. Changes to these
+# Targets that exist in the tree but are deliberately not built: the opt-out
+# from the rule above. Every entry must still have exactly one target definition
+# (classic defconfig or composed variant), so a rename leaves a stale name and
+# --self-test says so. Changes to these
 # narrow to nothing, exactly as they do today.
 NOT_BUILT = {
     # Cross-repository staging: its generic FH8626 Firmware base is not in
