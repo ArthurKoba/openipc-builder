@@ -50,9 +50,43 @@ autoup_rootfs() {
         ./output/images/autoupdate-rootfs.img
 }
 
+validate_fh8626_image_budget() {
+    local kernel rootfs kernel_size rootfs_size
+    local kernel_limit=2097152
+    local rootfs_limit=5242880
+
+    case "$DEVICE" in
+        fh8626v100_*) ;;
+        *) return 0 ;;
+    esac
+
+    kernel="${FIRMWARE_DIR}/output/images/uImage.fh8626v100"
+    rootfs="${FIRMWARE_DIR}/output/images/rootfs.squashfs.fh8626v100"
+
+    if [ ! -f "$kernel" ] || [ ! -f "$rootfs" ]; then
+        echo_c 31 "FH8626 image budget check cannot find kernel/rootfs artifacts"
+        return 1
+    fi
+
+    kernel_size=$(stat -c %s "$kernel") || return 1
+    rootfs_size=$(stat -c %s "$rootfs") || return 1
+
+    printf 'FH8626 uImage: %s / %s bytes\n' "$kernel_size" "$kernel_limit"
+    printf 'FH8626 rootfs: %s / %s bytes\n' "$rootfs_size" "$rootfs_limit"
+
+    if [ "$kernel_size" -gt "$kernel_limit" ]; then
+        echo_c 31 "FH8626 uImage exceeds the 2048 KiB NOR partition"
+        return 1
+    fi
+    if [ "$rootfs_size" -gt "$rootfs_limit" ]; then
+        echo_c 31 "FH8626 rootfs exceeds the 5120 KiB NOR partition"
+        return 1
+    fi
+}
+
 copy_to_archive() {
-    local archive_dir
-    local -a artifacts size_reports autoupdate
+    local archive_dir runtime_root runtime_manifest runtime_count path hash
+    local -a artifacts size_reports autoupdate archive_files
 
     if echo "${DEVICE}" | grep -q '^hi3518ev200_lite'; then
         autoup_rootfs || return 1
@@ -89,6 +123,31 @@ copy_to_archive() {
         cp -a "${FIRMWARE_DIR}/output/.config"             "$archive_dir/resolved.buildroot.config" || return 1
     fi
 
+    runtime_root="${FIRMWARE_DIR}/output/target"
+    runtime_manifest="$archive_dir/runtime-sha256.txt"
+    runtime_count=0
+    : > "$runtime_manifest" || return 1
+    for path in \
+        usr/libexec/majestic-fh8852v200/majestic \
+        lib/firmware/rtthread_arc.bin \
+        lib/modules/4.9.129/extra/vmm.ko \
+        lib/modules/4.9.129/extra/xbus_rpc.ko \
+        lib/modules/4.9.129/extra/media_process.ko \
+        lib/modules/4.9.129/extra/isp.ko \
+        lib/modules/4.9.129/extra/enc.ko \
+        lib/modules/4.9.129/extra/jpeg.ko \
+        lib/modules/4.9.129/extra/bgm.ko \
+        lib/modules/4.9.129/extra/gpio_wave.ko
+    do
+        [ -f "$runtime_root/$path" ] || continue
+        hash=$(sha256sum "$runtime_root/$path" | awk '{print $1}') || return 1
+        printf '%s  %s\n' "$hash" "$path" >> "$runtime_manifest" || return 1
+        runtime_count=$((runtime_count + 1))
+    done
+    if [ "$runtime_count" -eq 0 ]; then
+        rm -f "$runtime_manifest"
+    fi
+
     {
         printf 'target=%s\n' "$DEVICE"
         printf 'built_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -100,7 +159,25 @@ copy_to_archive() {
         if [ -f "$archive_dir/resolved.buildroot.config" ]; then
             printf 'resolved_config_sha256=%s\n'                 "$(sha256sum "$archive_dir/resolved.buildroot.config" | awk '{print $1}')"
         fi
+        if [ -f "$runtime_root/usr/libexec/majestic-fh8852v200/majestic" ]; then
+            printf 'majestic_sha256=%s\n' \
+                "$(sha256sum "$runtime_root/usr/libexec/majestic-fh8852v200/majestic" | awk '{print $1}')"
+        fi
+        if [ -f "$runtime_manifest" ]; then
+            printf 'runtime_manifest_sha256=%s\n' \
+                "$(sha256sum "$runtime_manifest" | awk '{print $1}')"
+        fi
     } > "$archive_dir/build-info.txt" || return 1
+
+    shopt -s nullglob
+    archive_files=("$archive_dir"/*)
+    shopt -u nullglob
+    : > "$archive_dir/SHA256SUMS" || return 1
+    for path in "${archive_files[@]}"; do
+        [ -f "$path" ] || continue
+        hash=$(sha256sum "$path" | awk '{print $1}') || return 1
+        printf '%s  %s\n' "$hash" "$(basename "$path")" >> "$archive_dir/SHA256SUMS" || return 1
+    done
 
     echo_c 35 "\nAssembled firmware available in:"
     tree -C "$archive_dir"
@@ -388,6 +465,7 @@ if [ ${BUILD_RC} -ne 0 ]; then
 fi
 
 make BOARD="${DEVICE}" size-report || true
+validate_fh8626_image_budget || exit 1
 
 copy_to_archive || exit 1
 echo_c 35 "\nDone"
