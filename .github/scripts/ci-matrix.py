@@ -65,7 +65,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 NOT_BUILT = {
     # Cross-repository staging: its generic FH8626 Firmware base is not in
     # OpenIPC/firmware yet, so the normal Builder clone cannot build it.
-    "fh8626v100_lite_anjia-ajl33pq0866",
+    "fh8626v100_lite_anjia-ajl33pq0866_divinus",
+    "fh8626v100_lite_anjia-ajl33pq0866_majestic",
+    "fh8626v100_lite_anjia-ajl33pq0866_diag",
     "gk7102ca_lite_umea-qc01x", "gk7102ca_lite_vstarcam-g8896wip",
     "gk7205v200_rubyfpv_generic", "hi3518ev200_lite_lenovo-snowman-1080p",
     "t31_lite_xiaomi-mjsxj05hl",
@@ -124,6 +126,7 @@ WORKFLOW = re.compile(r"^\.github/workflows/([^/]+)$")
 GITHUB_SCRIPT = re.compile(r"^\.github/scripts/([^/]+)$")
 DEVICE_PATH = re.compile(r"^devices/([^/]+)/(.*)$")
 DEVICE_DEFCONFIG = re.compile(r"^devices/[^/]+/.*/configs/(.+)_defconfig$")
+DEVICE_VARIANT = re.compile(r"^devices/[^/]+/.*/configs/variants/(.+)\.config$")
 PACKAGE_PATH = re.compile(r"^package/([^/]+)/")
 
 FULL_LABEL = "ci:full"
@@ -140,10 +143,20 @@ class Tree:
         self.root = root
         self.directory_of = {}    # target -> devices/<dir>
         self.traits_of = {}
-        for path in sorted(glob.glob(f"{root}/devices/*/**/configs/*_defconfig",
-                                     recursive=True)):
+        paths = sorted(glob.glob(f"{root}/devices/*/**/configs/*_defconfig",
+                                 recursive=True))
+        paths += sorted(glob.glob(f"{root}/devices/*/**/configs/variants/*.config",
+                                 recursive=True))
+        for path in paths:
             relative = path[len(root) + 1:]
-            target = os.path.basename(path)[: -len("_defconfig")]
+            if "/configs/variants/" in relative:
+                target = os.path.basename(path)[: -len(".config")]
+                if target == "base":
+                    continue
+            else:
+                target = os.path.basename(path)[: -len("_defconfig")]
+            if target in self.directory_of:
+                raise RuntimeError(f"duplicate Builder target definition: {target}")
             self.directory_of[target] = "/".join(relative.split("/")[:2])
             self.traits_of[target] = self._traits(path)
         self.built = sorted(t for t in self.directory_of if t not in NOT_BUILT)
@@ -152,6 +165,10 @@ class Tree:
     def _traits(self, path):
         with open(path) as handle:
             body = handle.read()
+        if f"{os.sep}configs{os.sep}variants{os.sep}" in path:
+            base = os.path.join(os.path.dirname(path), "base.config")
+            with open(base) as handle:
+                body = handle.read() + "\n" + body
 
         def string(option):
             found = re.search(rf'^{option}="([^"]*)"', body, re.M)
@@ -227,6 +244,11 @@ def classify(tree, changed, labels=(), event="pull_request", draft=False):
             if defconfig:
                 if defconfig.group(1) in tree.built:
                     targets.add(defconfig.group(1))
+                continue
+            variant = DEVICE_VARIANT.match(path)
+            if variant and variant.group(1) != "base":
+                if variant.group(1) in tree.built:
+                    targets.add(variant.group(1))
                 continue
             hits = tree.targets_in(f"devices/{device.group(1)}")
             if hits:
@@ -327,13 +349,13 @@ def self_test():
     for target in tree.built:
         matches = glob.glob(f"{REPO_ROOT}/devices/*/**/configs/{target}_defconfig",
                             recursive=True)
-        if len(matches) > 1:
-            # builder.sh now refuses an ambiguous target instead of copying
-            # multiple device trees over each other. Keep duplicates a CI
-            # error so the target remains buildable and unambiguous.
+        matches += glob.glob(
+            f"{REPO_ROOT}/devices/*/**/configs/variants/{target}.config",
+            recursive=True)
+        if len(matches) != 1:
             problems.append(
-                f"{target} has {len(matches)} defconfigs; builder.sh would "
-                f"refuse the ambiguous target")
+                f"{target} has {len(matches)} target definitions; builder.sh "
+                f"requires exactly one")
 
     # 2. Every opt-out must still name something. A renamed device leaves its
     #    old name here describing nothing, and the new one silently builds.
@@ -415,6 +437,12 @@ def self_test():
         (["devices/fh8626v100_lite_anjia-ajl33pq0866/general/package/"
           "anjia-ajl33pq0866-board-support/Config.in"],
          anjia, "a device-local package stays scoped to its device directory"),
+        (["devices/fh8626v100_lite_anjia-ajl33pq0866/br-ext-chip-fullhan/"
+          "configs/variants/base.config"],
+         anjia, "a composed variant base reaches all device variants"),
+        (["devices/fh8626v100_lite_anjia-ajl33pq0866/br-ext-chip-fullhan/"
+          "configs/variants/fh8626v100_lite_anjia-ajl33pq0866_divinus.config"],
+         0, "an opted-out composed variant remains opted out"),
         # A directory with no defconfig at all is still unknown, and unknown
         # still widens -- that is the half of this rule worth keeping.
         (["devices/a-device-that-does-not-exist/br-ext-chip-goke/board/x.config"],
