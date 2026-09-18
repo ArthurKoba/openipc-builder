@@ -1,0 +1,26 @@
+#!/bin/sh
+
+action="$1"
+device="$2"
+mountpoint="$3"
+
+# This retail board has one removable card and one supported data partition.
+[ "$device" = /dev/mmcblk0p1 ] || exit 0
+
+case "$action" in
+	add)
+		mkdir -p "$mountpoint/recordings" || exit 1
+		logger -p daemon.info -t storage \
+			"microSD ready at $mountpoint"
+		;;
+	remove)
+		# record_stop() closes and finalizes the MP4 synchronously. It is safe
+		# to call when recording is already stopped or Divinus is unavailable.
+		if pidof divinus >/dev/null 2>&1; then
+			wget -q -O /dev/null \
+				'http://127.0.0.1:18080/api/record?stop=1' || true
+		fi
+		sync
+		;;
+	*) exit 2 ;;
+esac

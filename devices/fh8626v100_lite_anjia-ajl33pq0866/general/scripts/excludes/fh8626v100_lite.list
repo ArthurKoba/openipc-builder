@@ -1,0 +1,5 @@
+# NFS is not used on this 8 MiB NOR profile.
+/lib/modules/4.9.129/kernel/fs/lockd/*.ko
+/lib/modules/4.9.129/kernel/fs/nfs/*.ko
+/lib/modules/4.9.129/kernel/fs/nfs_common/*.ko
+/lib/modules/4.9.129/kernel/net/sunrpc/*.ko

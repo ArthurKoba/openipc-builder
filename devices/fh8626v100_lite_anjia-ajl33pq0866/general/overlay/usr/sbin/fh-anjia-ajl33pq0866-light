@@ -1,0 +1,245 @@
+#!/bin/sh
+set -eu
+
+PINCTRL=/proc/driver/pinctrl
+GPIO_CLASS=/sys/class/gpio
+LEGACY_LOCK=/tmp/fh-anjia-ajl33pq0866-light.lock
+LOCK_FD=/tmp/fh-anjia-ajl33pq0866-light.flock
+IRCUT_PULSE_ACTIVE=0
+STATE=/tmp/fh-anjia-ajl33pq0866-light.state
+IRCUT_STATE=/tmp/fh-anjia-ajl33pq0866-ircut.state
+DEFAULT_CONFIG=/etc/default/fh8626-illumination
+RUNTIME_CONFIG=/tmp/fh8626-illumination.conf
+
+FH8626_IRCUT_DAY_GPIO=18
+FH8626_IRCUT_NIGHT_GPIO=60
+FH8626_IRCUT_ACTIVE=1
+FH8626_IRCUT_REST=0
+FH8626_IRCUT_PULSE_MS=190
+FH8626_IR_LED_GPIO=25
+FH8626_IR_LED_ACTIVE=1
+FH8626_WHITE_LED_GPIO=23
+FH8626_WHITE_LED_ACTIVE=1
+FH8626_LIGHT_SENSOR_CHANNEL=1
+
+[ ! -r "$DEFAULT_CONFIG" ] || . "$DEFAULT_CONFIG"
+[ ! -r "$RUNTIME_CONFIG" ] || . "$RUNTIME_CONFIG"
+
+valid_uint()
+{
+	case "$1" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$1" -ge "$2" ] && [ "$1" -le "$3" ]
+}
+
+valid_uint "$FH8626_IRCUT_DAY_GPIO" 0 127 || exit 2
+valid_uint "$FH8626_IRCUT_NIGHT_GPIO" 0 127 || exit 2
+valid_uint "$FH8626_IR_LED_GPIO" 0 127 || exit 2
+valid_uint "$FH8626_WHITE_LED_GPIO" 0 127 || exit 2
+valid_uint "$FH8626_LIGHT_SENSOR_CHANNEL" 0 7 || exit 2
+valid_uint "$FH8626_IRCUT_PULSE_MS" 20 1000 || exit 2
+valid_uint "$FH8626_IRCUT_ACTIVE" 0 1 || exit 2
+valid_uint "$FH8626_IRCUT_REST" 0 1 || exit 2
+valid_uint "$FH8626_IR_LED_ACTIVE" 0 1 || exit 2
+valid_uint "$FH8626_WHITE_LED_ACTIVE" 0 1 || exit 2
+[ "$FH8626_IRCUT_DAY_GPIO" != "$FH8626_IRCUT_NIGHT_GPIO" ] || exit 2
+[ "$FH8626_IRCUT_DAY_GPIO" != "$FH8626_IR_LED_GPIO" ] || exit 2
+[ "$FH8626_IRCUT_DAY_GPIO" != "$FH8626_WHITE_LED_GPIO" ] || exit 2
+[ "$FH8626_IRCUT_NIGHT_GPIO" != "$FH8626_IR_LED_GPIO" ] || exit 2
+[ "$FH8626_IRCUT_NIGHT_GPIO" != "$FH8626_WHITE_LED_GPIO" ] || exit 2
+[ "$FH8626_IR_LED_GPIO" != "$FH8626_WHITE_LED_GPIO" ] || exit 2
+[ "$FH8626_IRCUT_ACTIVE" != "$FH8626_IRCUT_REST" ] || exit 2
+
+cleanup_light()
+{
+	if [ "$IRCUT_PULSE_ACTIVE" = 1 ]; then
+		gpio_set "$FH8626_IRCUT_DAY_GPIO" "$FH8626_IRCUT_REST" || true
+		gpio_set "$FH8626_IRCUT_NIGHT_GPIO" "$FH8626_IRCUT_REST" || true
+	fi
+	# Never unlink the flock inode: another waiter may already hold it open.
+}
+
+acquire_lock()
+{
+	# During upgrade do not overlap a still-running legacy GPIO helper. An
+	# empty PID file is NOT proof of a live owner (observed on this camera).
+	if [ -r "$LEGACY_LOCK/pid" ]; then
+		oldpid="$(cat "$LEGACY_LOCK/pid" 2>/dev/null || true)"
+		case "$oldpid" in
+			''|*[!0-9]*) ;;
+			*) if kill -0 "$oldpid" 2>/dev/null; then
+				echo "ERROR: legacy illumination helper still active" >&2
+				exit 1
+			fi ;;
+		esac
+	fi
+	# BusyBox CONFIG_FLOCK=y in this board firmware. Kernel-owned lifetime
+	# survives neither process exit nor reboot; no mkdir/PID recovery race.
+	umask 077
+	exec 9>>"$LOCK_FD"
+	if ! flock -n 9; then
+			echo "ERROR: illumination transition already in progress" >&2
+			exit 1
+	fi
+	trap cleanup_light EXIT
+	trap 'exit 130' INT
+	trap 'exit 143' TERM
+	trap 'exit 129' HUP
+}
+
+gpio_path() { echo "$GPIO_CLASS/GPIO$1"; }
+
+gpio_export()
+{
+	num="$1"
+	path="$(gpio_path "$num")"
+	[ -d "$path" ] || echo "$num" > "$GPIO_CLASS/export" 2>/dev/null || true
+	i=0
+	while [ ! -d "$path" ] && [ "$i" -lt 20 ]; do
+		sleep 0.01
+		i=$((i + 1))
+	done
+	[ -d "$path" ] || { echo "ERROR: GPIO$num was not exported" >&2; return 1; }
+}
+
+gpio_low()
+{
+	num="$1"
+	gpio_export "$num"
+	echo low > "$(gpio_path "$num")/direction"
+}
+
+gpio_set()
+{
+	num="$1"
+	value="$2"
+	gpio_export "$num"
+	echo "$value" > "$(gpio_path "$num")/value"
+}
+
+select_shared_pad()
+{
+	device="$1"
+	[ -w "$PINCTRL" ] || { echo "ERROR: $PINCTRL is unavailable" >&2; return 1; }
+	echo "dev,$device,0,0" > "$PINCTRL"
+}
+
+white_off()
+{
+	gpio_low "$FH8626_WHITE_LED_GPIO"
+	gpio_set "$FH8626_WHITE_LED_GPIO" "$((1 - FH8626_WHITE_LED_ACTIVE))"
+	select_shared_pad "SADC_CHANL$FH8626_LIGHT_SENSOR_CHANNEL"
+	echo sadc > "$STATE"
+}
+
+white_on()
+{
+	gpio_low "$FH8626_WHITE_LED_GPIO"
+	select_shared_pad "GPIO$FH8626_WHITE_LED_GPIO"
+	if ! gpio_set "$FH8626_WHITE_LED_GPIO" "$FH8626_WHITE_LED_ACTIVE"; then
+		white_off
+		return 1
+	fi
+	echo white > "$STATE"
+}
+
+sadc_read()
+{
+	white_off
+	sleep 0.1
+	grep "^channel: $FH8626_LIGHT_SENSOR_CHANNEL[[:space:]]" /proc/driver/sadc || {
+		echo "ERROR: SADC channel $FH8626_LIGHT_SENSOR_CHANNEL reading unavailable" >&2
+		return 1
+	}
+}
+
+ir_set()
+{
+	value="$1"
+	gpio_low "$FH8626_IR_LED_GPIO"
+	select_shared_pad "GPIO$FH8626_IR_LED_GPIO"
+	if [ "$value" = 1 ]; then
+		gpio_set "$FH8626_IR_LED_GPIO" "$FH8626_IR_LED_ACTIVE"
+	else
+		gpio_set "$FH8626_IR_LED_GPIO" "$((1 - FH8626_IR_LED_ACTIVE))"
+	fi
+}
+
+ircut_set()
+{
+	mode="$1"
+	gpio_low "$FH8626_IRCUT_DAY_GPIO"
+	gpio_low "$FH8626_IRCUT_NIGHT_GPIO"
+	select_shared_pad "GPIO$FH8626_IRCUT_DAY_GPIO"
+	select_shared_pad "GPIO$FH8626_IRCUT_NIGHT_GPIO"
+	gpio_set "$FH8626_IRCUT_DAY_GPIO" "$FH8626_IRCUT_REST"
+	gpio_set "$FH8626_IRCUT_NIGHT_GPIO" "$FH8626_IRCUT_REST"
+	IRCUT_PULSE_ACTIVE=1
+	case "$mode" in
+		day) gpio_set "$FH8626_IRCUT_DAY_GPIO" "$FH8626_IRCUT_ACTIVE" ;;
+		night) gpio_set "$FH8626_IRCUT_NIGHT_GPIO" "$FH8626_IRCUT_ACTIVE" ;;
+	esac
+	sleep "$(awk "BEGIN { printf \"%.3f\", $FH8626_IRCUT_PULSE_MS / 1000 }")"
+	gpio_set "$FH8626_IRCUT_DAY_GPIO" "$FH8626_IRCUT_REST"
+	gpio_set "$FH8626_IRCUT_NIGHT_GPIO" "$FH8626_IRCUT_REST"
+	IRCUT_PULSE_ACTIVE=0
+	echo "$mode" > "$IRCUT_STATE"
+}
+
+status()
+{
+	mode=unknown
+	ircut=unknown
+	[ -r "$STATE" ] && mode="$(cat "$STATE")"
+	[ -r "$IRCUT_STATE" ] && ircut="$(cat "$IRCUT_STATE")"
+	echo "pad70=$mode ircut=$ircut"
+	echo "config day_pin=$FH8626_IRCUT_DAY_GPIO night_pin=$FH8626_IRCUT_NIGHT_GPIO ir_pin=$FH8626_IR_LED_GPIO white_pin=$FH8626_WHITE_LED_GPIO sadc_channel=$FH8626_LIGHT_SENSOR_CHANNEL pulse_ms=$FH8626_IRCUT_PULSE_MS ir_active=$FH8626_IR_LED_ACTIVE white_active=$FH8626_WHITE_LED_ACTIVE ircut_active=$FH8626_IRCUT_ACTIVE ircut_rest=$FH8626_IRCUT_REST"
+	for num in "$FH8626_IRCUT_DAY_GPIO" "$FH8626_IRCUT_NIGHT_GPIO" "$FH8626_IR_LED_GPIO" "$FH8626_WHITE_LED_GPIO"; do
+		path="$(gpio_path "$num")"
+		if [ -d "$path" ]; then
+			echo "GPIO$num direction=$(cat "$path/direction") value=$(cat "$path/value")"
+		else
+			echo "GPIO$num unexported"
+		fi
+	done
+}
+
+write_divinus_state()
+{
+	# Keep the Divinus camera API independent from the former owner FIFO.
+	scene=auto
+	mode=sadc
+	[ -r "$STATE" ] && mode="$(cat "$STATE")"
+	[ "$mode" = white ] && scene=wlight
+	[ "$mode" = sadc ] && scene=auto
+	ircut=unknown
+	[ -r "$IRCUT_STATE" ] && ircut="$(cat "$IRCUT_STATE")"
+	irled=0
+	white=0
+	[ -r "$(gpio_path "$FH8626_IR_LED_GPIO")/value" ] && irled="$(cat "$(gpio_path "$FH8626_IR_LED_GPIO")/value")"
+	[ -r "$(gpio_path "$FH8626_WHITE_LED_GPIO")/value" ] && white="$(cat "$(gpio_path "$FH8626_WHITE_LED_GPIO")/value")"
+	light=0
+	printf 'scene=%s ircut=%s irled=%s white=%s light=%s\n' "$scene" "$ircut" "$irled" "$white" "$light" > /tmp/fh8626_illum.state
+}
+
+usage()
+{
+	echo "usage: $0 white on|off | ir on|off | ircut day|night | sadc | status | init" >&2
+	exit 2
+}
+
+case "${1:-}" in
+	status) status; exit 0 ;;
+esac
+
+acquire_lock
+case "${1:-}:${2:-}" in
+	white:on) white_on; write_divinus_state ;;
+	white:off) white_off; write_divinus_state ;;
+	sadc:) sadc_read; write_divinus_state ;;
+	ir:on) ir_set 1; write_divinus_state ;;
+	ir:off) ir_set 0; write_divinus_state ;;
+	ircut:day) ircut_set day; write_divinus_state ;;
+	ircut:night) ircut_set night; write_divinus_state ;;
+	init:) white_off; ir_set 0 ;;
+	*) usage ;;
+esac
