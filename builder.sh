@@ -5,7 +5,9 @@
 DEVICE="$1"
 BUILDER_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 FIRMWARE_DIR="${BUILDER_DIR}/openipc"
-FIRMWARE_REPO="${OPENIPC_FW_REPO:-https://github.com/OpenIPC/firmware.git}"
+FIRMWARE_TMP="${BUILDER_DIR}/.openipc.new.$"
+DEFAULT_FIRMWARE_REPO="https://github.com/OpenIPC/firmware.git"
+FIRMWARE_REPO="${OPENIPC_FW_REPO:-$DEFAULT_FIRMWARE_REPO}"
 TIMESTAMP=$(date +"%Y%m%d%H%M")
 VERSION=$(stat -c"%Y" "$0")
 
@@ -42,51 +44,58 @@ autoup_rootfs() {
 }
 
 copy_to_archive() {
+    local archive_dir
+    local -a artifacts size_reports autoupdate
+
     if echo "${DEVICE}" | grep -q '^hi3518ev200_lite'; then
         autoup_rootfs || return 1
     fi
 
-    echo_c 32 "Copying files to local archive"
-    mkdir -p "${BUILDER_DIR}/archive/${DEVICE}/${TIMESTAMP}"
-    cp -a \
-        ${FIRMWARE_DIR}/output/images/rootfs.squashfs.* \
-        ${FIRMWARE_DIR}/output/images/uImage.* \
-        ${FIRMWARE_DIR}/output/images/*.tar \
-        ${FIRMWARE_DIR}/output/images/openipc.*.tgz \
-        "${BUILDER_DIR}/archive/${DEVICE}/${TIMESTAMP}" || return 1
+    archive_dir="${BUILDER_DIR}/archive/${DEVICE}/${TIMESTAMP}"
+    mkdir -p "$archive_dir" || return 1
 
-    cp -a ${FIRMWARE_DIR}/output/images/sizes.*.json \
-        "${BUILDER_DIR}/archive/${DEVICE}/${TIMESTAMP}" 2>/dev/null || true
+    shopt -s nullglob
+    artifacts=(
+        "${FIRMWARE_DIR}"/output/images/rootfs.squashfs.*
+        "${FIRMWARE_DIR}"/output/images/uImage.*
+        "${FIRMWARE_DIR}"/output/images/*.tar
+        "${FIRMWARE_DIR}"/output/images/openipc.*.tgz
+    )
+    size_reports=("${FIRMWARE_DIR}"/output/images/sizes.*.json)
+    autoupdate=("${FIRMWARE_DIR}"/output/images/autoupdate*)
+    shopt -u nullglob
 
-    if [ -f "${FIRMWARE_DIR}/output/images/autoupdate-kernel.img" ]; then
-        cp -a ${FIRMWARE_DIR}/output/images/autoupdate* \
-            "${BUILDER_DIR}/archive/${DEVICE}/${TIMESTAMP}" || return 1
+    if [ "${#artifacts[@]}" -eq 0 ]; then
+        echo_c 31 "No firmware artifacts found after successful build"
+        return 1
     fi
+
+    echo_c 32 "Copying files to local archive"
+    cp -a "${artifacts[@]}" "$archive_dir/" || return 1
+    [ "${#size_reports[@]}" -eq 0 ] || cp -a "${size_reports[@]}" "$archive_dir/" || return 1
+    [ "${#autoupdate[@]}" -eq 0 ] || cp -a "${autoupdate[@]}" "$archive_dir/" || return 1
 
     echo_c 35 "\nAssembled firmware available in:"
-    tree -C "${BUILDER_DIR}/archive/${DEVICE}/${TIMESTAMP}"
-}
-
-copy_to_tftp() {
-    echo_c 32 "\nCopying files to a TFTP server using SCP protocol"
-    scp -r \
-        ${FIRMWARE_DIR}/output/images/rootfs.squashfs.* \
-        ${FIRMWARE_DIR}/output/images/uImage.* \
-        ${FIRMWARE_DIR}/output/images/openipc.*.tgz \
-        "${TFTP_STORAGE}"
-
-    if [ -f "${FIRMWARE_DIR}/output/images/autoupdate-kernel.img" ]; then
-        scp -r ${FIRMWARE_DIR}/output/images/autoupdate* "${TFTP_STORAGE}"
-    fi
+    tree -C "$archive_dir"
 }
 
 select_device() {
-    AVAILABLE_DEVICES=$(find devices -name '*_defconfig' | sort | cut -d/ -f5)
-    cmd="whiptail --title \"Available devices\" --menu \"Please select a device from the list below:\" 20 70 12"
-    for p in ${AVAILABLE_DEVICES//_defconfig}; do
-        cmd="${cmd} \"$p\" \"\""
-    done
-    DEVICE=$(eval "${cmd} 3>&1 1>&2 2>&3")
+    local path target
+    local -a menu=()
+
+    while IFS= read -r path; do
+        target=$(basename "$path" _defconfig)
+        menu+=("$target" "")
+    done < <(find devices -name '*_defconfig' -print | sort)
+
+    if [ "${#menu[@]}" -eq 0 ]; then
+        echo_c 31 "No device defconfigs found"
+        exit 2
+    fi
+
+    DEVICE=$(whiptail --title "Available devices" \
+        --menu "Please select a device from the list below:" 20 70 12 \
+        "${menu[@]}" 3>&1 1>&2 2>&3)
     if [ $? != 0 ]; then
         echo_c 31 "Cancelled."
         exit 1
@@ -110,6 +119,37 @@ validate_build_environment() {
         echo_c 31 "Remove Windows/WSL PATH entries with spaces and retry."
         exit 2
     fi
+}
+
+validate_firmware_source() {
+    if [ "$FIRMWARE_REPO" != "$DEFAULT_FIRMWARE_REPO" ] &&
+       [ -z "${OPENIPC_FW_REV:-}" ]; then
+        echo_c 31 "OPENIPC_FW_REPO override requires OPENIPC_FW_REV"
+        echo_c 31 "Pin the staging fork to a branch, tag, or commit explicitly."
+        exit 2
+    fi
+}
+
+cleanup_firmware_tmp() {
+    [ ! -e "$FIRMWARE_TMP" ] || rm -rf -- "$FIRMWARE_TMP"
+}
+
+prepare_firmware_checkout() {
+    cleanup_firmware_tmp
+
+    if [ -n "${OPENIPC_FW_REV:-}" ]; then
+        echo_c 33 "\nDownloading Firmware @ ${OPENIPC_FW_REV}"
+        git clone "$FIRMWARE_REPO" "$FIRMWARE_TMP" || return 1
+        git -C "$FIRMWARE_TMP" checkout --detach "$OPENIPC_FW_REV" || return 1
+    else
+        echo_c 33 "\nDownloading Firmware"
+        git clone --depth=1 "$FIRMWARE_REPO" "$FIRMWARE_TMP" || return 1
+    fi
+
+    git -C "$FIRMWARE_TMP" rev-parse --verify HEAD >/dev/null || return 1
+
+    rm -rf -- "$FIRMWARE_DIR"
+    mv "$FIRMWARE_TMP" "$FIRMWARE_DIR" || return 1
 }
 
 register_package_tree() {
@@ -168,26 +208,22 @@ done
 
 resolve_device
 validate_build_environment
+validate_firmware_source
 validate_device_packages
+
+trap cleanup_firmware_tmp EXIT
 
 echo_c 31 "\nStarting a device for ${DEVICE}"
 tree -C "${ITEM}"
 
 # Build exactly the checked-out Builder revision. Do not mutate this checkout.
 if [ "$FIRMWARE_DIR" != "${BUILDER_DIR}/openipc" ]; then
-    echo_c 31 "Refusing to remove unexpected firmware directory: ${FIRMWARE_DIR}"
+    echo_c 31 "Refusing to use unexpected firmware directory: ${FIRMWARE_DIR}"
     exit 2
 fi
-rm -rf -- "$FIRMWARE_DIR"
 
-if [ -n "${OPENIPC_FW_REV:-}" ]; then
-    echo_c 33 "\nDownloading Firmware @ ${OPENIPC_FW_REV}"
-    git clone "$FIRMWARE_REPO" "$FIRMWARE_DIR" || exit 1
-    git -C "$FIRMWARE_DIR" checkout "$OPENIPC_FW_REV" || exit 1
-else
-    echo_c 33 "\nDownloading Firmware"
-    git clone --depth=1 "$FIRMWARE_REPO" "$FIRMWARE_DIR" || exit 1
-fi
+prepare_firmware_checkout || exit 1
+echo_c 30 "Firmware revision: $(git -C "$FIRMWARE_DIR" rev-parse HEAD)"
 
 echo_c 33 "\nCopying extra packages"
 copy_extra_packages || exit 1

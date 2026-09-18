@@ -29,12 +29,16 @@ self-update with `git pull`; update or switch Builder revisions explicitly befor
 a build.
 
 What `builder.sh <device>` does, in order:
-1. Resolve exactly one matching device defconfig and validate the host `PATH` for Buildroot.
-2. Remove only the local `openipc/` worktree, then clone `OpenIPC/firmware` — HEAD by default,
-   or the repository/ref selected by `$OPENIPC_FW_REPO` and `$OPENIPC_FW_REV`.
-3. `copy_extra_packages` — copy `package/*` into `openipc/general/package/` and append a
-   `source "...Config.in"` line for each into the external tree's `Config.in`.
-4. Copy `devices/<device>/*` over the firmware tree (defconfig, overlay, excludes, board).
+1. Resolve exactly one matching device defconfig, validate the host `PATH`, and validate
+   device-local package names before doing network/build work.
+2. Clone Firmware into a temporary sibling checkout and replace `openipc/` only after the
+   requested ref resolves successfully. Upstream HEAD is the default. A non-upstream
+   `$OPENIPC_FW_REPO` is accepted only together with an explicit `$OPENIPC_FW_REV`.
+3. `copy_extra_packages` copies repository-wide `package/*` into
+   `openipc/general/package/`. These packages intentionally affect every Builder target.
+4. Copy `devices/<device>/*` over the firmware tree, then register any
+   `devices/<device>/general/package/*` packages. Device-local packages therefore exist
+   only for that named device and do not widen unrelated builds.
 5. `make BOARD=<device>` then best-effort `make BOARD=<device> size-report`.
 6. `copy_to_archive` → `archive/<device>/<timestamp>/`. For `hi3518ev200_lite` it also runs
    `autoup_rootfs` to wrap the images as `autoupdate-*.img` via `mkimage`.
