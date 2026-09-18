@@ -2,25 +2,33 @@
 
 device=/dev/mmcblk0p1
 mountpoint=/mnt/mmcblk0p1
-hook=/usr/share/openipc/automount-hook
 
 mounted()
 {
-	grep -qs "^$device $mountpoint " /proc/mounts
+    grep -qs "^$device $mountpoint " /proc/mounts
 }
 
 case "${1:-start}" in
-	start)
-		# S38mdev normally mounted the card already. Replaying the board hook is
-		# harmless and also repairs the directory after a rootfs-only update.
-		mounted && "$hook" add "$device" "$mountpoint"
-		;;
-	stop)
-		if mounted; then
-			"$hook" remove "$device" "$mountpoint"
-			umount "$mountpoint"
-		fi
-		;;
-	restart) "$0" stop; "$0" start ;;
-	*) echo "usage: $0 {start|stop|restart}" >&2; exit 2 ;;
+    start)
+        # Generic OpenIPC mdev owns card insertion/removal and the mount itself.
+        # The named-device layer only prepares the directory used by the
+        # current recording profile when the card was already present at boot.
+        mounted && mkdir -p "$mountpoint/recordings"
+        ;;
+    stop)
+        # Runtime services stop earlier during rcK. Finish with a streamer-
+        # neutral sync/unmount rather than calling a Divinus/Majestic API.
+        if mounted; then
+            sync
+            umount "$mountpoint"
+        fi
+        ;;
+    restart)
+        "$0" stop
+        "$0" start
+        ;;
+    *)
+        echo "usage: $0 {start|stop|restart}" >&2
+        exit 2
+        ;;
 esac
