@@ -90,6 +90,20 @@ jobs:
           echo "OPENIPC_FW_REPO=$MIRROR" >> "${GITHUB_ENV}"
           echo "OPENIPC_OUTPUT_ROOT=$OUTPUT_ROOT" >> "${GITHUB_ENV}"
 
+      - name: Ensure Buildroot host dependencies
+        run: |
+          need_install=0
+          for cmd in file bc cpio rsync unzip wget lzop make gcc g++ python3 pkg-config; do
+            command -v "$cmd" >/dev/null 2>&1 || need_install=1
+          done
+          dpkg -s libncurses-dev libssl-dev >/dev/null 2>&1 || need_install=1
+          if [ "$need_install" -eq 1 ]; then
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+              automake autotools-dev bc build-essential cpio curl file git libncurses-dev \
+              libssl-dev libtool lzop make pkg-config python3 python3-pip rsync tree unzip wget xz-utils
+          fi
+
       - name: Refresh moving-ref package downloads
         run: |
           # The monthly builder-dl cache freezes moving-ref downloads under a constant
@@ -121,20 +135,9 @@ jobs:
           export BR2_DL_DIR=/runner/cache/buildroot-dl
 
           NAME=${{inputs.platform}}
-          # Retry budget for transient upstream toolchain/CDN flakes
-          # (matches master.yml + OpenIPC/firmware/build-one.yml).
-          backoffs="30 60 120 300 600 1200"
-          attempt=1
-          for sleep_for in $backoffs ""; do
-            bash builder.sh ${NAME} && break
-            if [ -z "$sleep_for" ]; then
-              echo "::error::build failed after ${attempt} attempts"
-              exit 1
-            fi
-            echo "::warning::attempt ${attempt} failed, retrying after ${sleep_for}s"
-            sleep "$sleep_for"
-            attempt=$((attempt + 1))
-          done
+          # Development builds must fail fast on deterministic compiler/configuration
+          # errors. Retrying the same local failure only hides the root cause.
+          bash builder.sh "${NAME}"
           cd openipc
 
           TIME=$(date -d @${SECONDS} +%M:%S)
