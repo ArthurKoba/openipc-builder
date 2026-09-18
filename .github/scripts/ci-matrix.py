@@ -15,13 +15,8 @@ out to the full matrix. Getting the classification wrong therefore costs runner
 time, never coverage.
 
 The device -> files mapping is not written down here, it is read off the tree
-the same way builder.sh reads it. builder.sh line 121 does
-
-    ITEM=$(find devices -name ${DEVICE}_defconfig | cut -d/ -f1,2)
-    cp -afv ${BUILDER_DIR}/${ITEM}/* ${FIRMWARE_DIR}
-
--- it locates the device by its defconfig and copies that WHOLE devices/<dir>/
-tree over the firmware clone. So the devices a file affects are exactly the
+the same way builder.sh reads it. builder.sh resolves exactly one matching <device>_defconfig, derives its
+devices/<dir>/ root, and copies that WHOLE directory over the firmware clone. So the devices a file affects are exactly the
 devices whose defconfig lives in the same directory. That matters: devices/common/
 holds 18 targets and devices/apfpv/ holds 2, and treating either as one device
 would skip 17 real builds.
@@ -71,7 +66,6 @@ NOT_BUILT = {
     # Cross-repository staging: its generic FH8626 Firmware base is not in
     # OpenIPC/firmware yet, so the normal Builder clone cannot build it.
     "fh8626v100_lite_anjia-ajl33pq0866",
-    "fh8626v100_lite_anjia-ajl33pq0866_majestic",
     "gk7102ca_lite_umea-qc01x", "gk7102ca_lite_vstarcam-g8896wip",
     "gk7205v200_rubyfpv_generic", "hi3518ev200_lite_lenovo-snowman-1080p",
     "t31_lite_xiaomi-mjsxj05hl",
@@ -333,11 +327,12 @@ def self_test():
         matches = glob.glob(f"{REPO_ROOT}/devices/*/**/configs/{target}_defconfig",
                             recursive=True)
         if len(matches) > 1:
-            # builder.sh does `find ... | cut -d/ -f1,2` and copies the result
-            # unquoted, so two matches make it copy two trees over each other.
+            # builder.sh now refuses an ambiguous target instead of copying
+            # multiple device trees over each other. Keep duplicates a CI
+            # error so the target remains buildable and unambiguous.
             problems.append(
                 f"{target} has {len(matches)} defconfigs; builder.sh would "
-                f"resolve it to more than one directory")
+                f"refuse the ambiguous target")
 
     # 2. Every opt-out must still name something. A renamed device leaves its
     #    old name here describing nothing, and the new one silently builds.

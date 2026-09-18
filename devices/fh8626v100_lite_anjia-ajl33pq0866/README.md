@@ -1,56 +1,135 @@
-# FH8626V100 ANJIA AJL33PQ0866 clean device profile
+# FH8626V100 ANJIA AJL33PQ0866 device profile
 
-This branch reconstructs the named ANJIA profile as a thin Builder layer on top
-of the clean FH8626V100 Firmware/Linux split.
+This directory is the named-camera layer for ANJIA AJL33PQ0866. It is intentionally
+thin: generic FH8626V100 implementation is supplied by Firmware/Linux and streamer
+implementation is supplied by Divinus or Majestic.
 
-Cross-repository staging dependencies:
+## Repository boundary
+
+Builder owns only AJL33PQ0866 policy and assembly:
+
+- the board-only kernel fragment, including one-bit SD0 and this board's
+  RTC/TSENSOR disable policy;
+- RTL8188FU selection and persistent first-boot device settings;
+- the physical GPIO map and the GPIO23/SADC1 shared-pad policy;
+- illumination/IR-cut low-level helpers and safe output handling;
+- source-built AJL33PQ0866 PTZ and WIDE/TELE low-level backends;
+- removable-storage shutdown policy;
+- runtime selection and runtime-specific named-device configuration.
+
+Builder does not contain generic FH8626 kernel/platform/media code, Linux
+patches, factory Fullhan .ko/.so/.bin payloads, Divinus implementation source or
+the Majestic compatibility package.
+
+Current cross-repository staging inputs are:
 
 - Firmware core: `ArthurKoba/openipc-firmware/work/fh8626v100@eabd1ccd4684af6997771269c4655f7e4435bcec`;
 - Linux: `ArthurKoba/openipc-linux/work/fh8626v100@357c2d13e7589db0dbe2bbf89c2ec38b1c036e6e`;
-- Divinus implementation: `ArthurKoba/openipc-divinus/work/fh8626v100@1e624bd5aca97ba772413d2b00a10314d1db039f`; it is selected by this device defconfig but is not patched or copied here.
+- Divinus implementation: `ArthurKoba/openipc-divinus/work/fh8626v100@1e624bd5aca97ba772413d2b00a10314d1db039f`.
 
-The profile keeps only named-device deltas: the ANJIA kernel fragment, RTL8188FU
-selection, microSD policy, device GPIO/illumination configuration and
-source-built PTZ/lens support.
+The exact Linux tarball in the defconfig is a temporary engineering pin until
+the curated Linux series has an OpenIPC-owned ref.
 
-The one-bit SD0 slot is selected through the hardware-oriented kernel symbol:
+## Runtime targets
 
-`CONFIG_FH8626V100_SD0_1BIT=y`
+The main target is:
 
-The historical retail-named symbol
-`CONFIG_FH8626V100_AJL33PQ0866_MMC` is not used.
+`fh8626v100_lite_anjia-ajl33pq0866`
 
-This branch intentionally contains no generic FH8626 kernel config, no FH8626
-kernel patch directory, no factory `.ko/.so/.bin` payloads and no Divinus source
-or patch. Those belong respectively to Firmware/Linux, evidence/provenance work
-and Divinus.
+It selects Divinus plus the small
+`anjia-ajl33pq0866-divinus-config` package. The Divinus YAML is not in the
+shared device overlay, so it does not leak into other runtime directions.
 
-The exact Linux tarball URL is a temporary engineering pin to the ArthurKoba
-fork until the curated series lands in `OpenIPC/linux`. `builder.sh` supports
-`OPENIPC_FW_REPO` and `OPENIPC_FW_REV`, so this staging profile can be built
-against the fork-local Firmware core without copying generic FH8626 code into
-Builder. The ordinary no-override path still clones upstream `OpenIPC/firmware`.
+The Majestic direction is maintained on
+`work/fh8626v100-anjia-majestic` as the separate named target
+`fh8626v100_lite_anjia-ajl33pq0866_majestic`. Its implementation package stays
+in Firmware; Builder only selects that Firmware direction and applies this same
+board policy.
 
-The device remains temporarily listed in Builder CI `NOT_BUILT` because normal
-CI does not consume the fork-local Firmware core. Remove that opt-out only when
-the required Firmware state is available through the normal CI clone path.
+Both targets remain in CI `NOT_BUILT` while their required FH8626 Firmware
+refs are fork-local.
 
-No build or hardware acceptance is implied by this source-only staging profile.
+## PTZ
 
-## Runtime staging profiles
+Production PTZ is a stateless relative backend over the hardware-proven
+`/dev/fh_pwm` channel map. It exposes the normal OpenIPC interface:
 
-The shared ANJIA board overlay can currently be built in two runtime directions:
+`gpio-motors PAN_STEPS TILT_STEPS DELAY_MS`
 
-- `fh8626v100_lite_anjia-ajl33pq0866` — Divinus development profile.
-- `fh8626v100_lite_anjia-ajl33pq0866_majestic` — experimental Majestic control-plane profile.
+There is no automatic calibration, boot movement, saved absolute coordinate,
+`home` or `goto` state. This hardware has no absolute position feedback, so a
+coordinate saved across power loss is not authoritative physical position.
 
-The Majestic profile must be built against the matching Firmware staging branch rather than upstream Firmware:
+The earlier stock-style controller remains reference/evidence only at tag
+`archive/fh8626v100-anjia-stock-ptz-controller-20260918`.
 
-```sh
-OPENIPC_FW_REPO=https://github.com/ArthurKoba/openipc-firmware.git
-OPENIPC_FW_REV=work/fh8626v100-majestic
-bash builder.sh fh8626v100_lite_anjia-ajl33pq0866_majestic
-```
+PTZ and lens switching are separate. `fh8626-lens` owns only the physical
+GPIO4/GPIO14 selector and stock target-first ordering. A streamer/media owner
+must coordinate VENC, orientation and exposure around a logical WIDE/TELE
+switch.
 
-The Majestic branch intentionally ships media disabled. Historical target testing proved the FH8852V200 Majestic HTTP/WebUI control plane can run on FH8626V100, while the video/ISP capture path remains an unresolved compatibility task. Do not treat this profile as a completed camera runtime.
+## Dual-sensor bootstrap
 
+TELE visibility after cold boot has a separate hardware prerequisite: GPIO5
+must be LOW before the validated Fullhan media-module initialization sequence
+and HIGH before sensor/media startup.
+
+That transaction cannot be reproduced correctly by an unrelated early/late
+Builder init script. Builder records the board contract; the selected media
+runtime must place the two edges around its actual media initialization. GPIO5
+is not toggled on ordinary WIDE/TELE switches.
+
+## Illumination and IR-cut
+
+Board wiring is:
+
+- IR LED GPIO25, active high;
+- white LED GPIO23, active high;
+- IR-cut actuator GPIO18/GPIO60;
+- light input SADC channel 1, sharing pad70 with white-light GPIO23.
+
+`fh-anjia-ajl33pq0866-light` owns only these physical operations. AUTO
+hysteresis, day/night/WLIGHT scene choice and ISP transitions belong to the
+selected media runtime. `S68anjia-hardware` only establishes safe outputs at
+boot/shutdown: LEDs off, pad70 returned to SADC and both IR-cut drive lines at
+rest; it does not move the filter merely because the process starts or stops.
+
+The current IR-cut active/rest values are retained from the already-staged
+working helper. Their final polarity/actuator direction is an explicit hardware
+regression gate; do not silently infer it from GPIO numbering.
+
+## Storage and identity
+
+The one-bit SD0 slot is selected with
+`CONFIG_FH8626V100_SD0_1BIT=y`. Generic OpenIPC mdev owns hotplug mounting;
+the device init script only creates the recording directory when a card is
+already mounted and syncs/unmounts it on shutdown.
+
+`fw_env.config` addresses the native OpenIPC 64 KiB environment partition as
+`/dev/mtd1`. The customizer does not overwrite serial/cid/uuid/ethaddr. It
+sets the board-qualified update URL and the RTL8188FU runtime profile only when
+the module is actually present.
+
+The full named-device defconfig still repeats architecture/toolchain/kernel
+selection because Builder overlays complete Buildroot defconfigs. Those lines
+select the shared Firmware/Linux implementation; they are not copies of generic
+FH8626 source.
+
+## Validation state
+
+Source-level checks for the cleaned board-support code pass, including the PTZ
+recorder tests and warning-clean host compilation. This is not hardware
+acceptance.
+
+Remaining owner gates are:
+
+- build both named targets against their exact Firmware directions and record
+  the resolved config plus kernel/rootfs sizes;
+- cold-boot GPIO5 dual-sensor bootstrap and WIDE/TELE switching;
+- relative pan/tilt direction, requested delay/speed, cancellation and safe
+  output disable with no boot movement;
+- IR/white LED, IR-cut DAY/NIGHT direction/polarity, SADC shared-pad restore and
+  shutdown safe state;
+- microSD hotplug/shutdown, RTL8188FU, reset-button path and persistent U-Boot
+  settings;
+- streamer-specific media/audio acceptance in the owning Divinus/Majestic path.
