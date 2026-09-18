@@ -1,0 +1,57 @@
+#!/bin/sh
+
+TARGET_FILE=/etc/openipc/builder-target
+
+env_value()
+{
+    fw_printenv -n "$1" 2>/dev/null || true
+}
+
+set_env()
+{
+    key="$1"
+    value="$2"
+    [ "$(env_value "$key")" = "$value" ] || fw_setenv "$key" "$value"
+}
+
+clear_env()
+{
+    key="$1"
+    [ -z "$(env_value "$key")" ] || fw_setenv "$key"
+}
+
+sync_env()
+{
+    # Never mutate persistent U-Boot state from TFTP/initramfs validation.
+    grep -q ' / squashfs ' /proc/mounts || return 0
+
+    target=$(cat "$TARGET_FILE" 2>/dev/null || true)
+    case "$target" in
+        fh8626v100_lite_anjia-ajl33pq0866|fh8626v100_lite_anjia-ajl33pq0866_majestic)
+            ;;
+        *)
+            echo "Invalid or missing Builder target identity: $target" >&2
+            return 1
+            ;;
+    esac
+
+    set_env upgrade "https://github.com/OpenIPC/builder/releases/download/latest/${target}-nor.tgz"
+
+    if find /lib/modules -name 8188fu.ko -type f 2>/dev/null | grep -q .; then
+        set_env wlandev rtl8188fu-generic
+    else
+        clear_env wlandev
+    fi
+}
+
+case "${1:-start}" in
+    start|restart)
+        sync_env
+        ;;
+    stop)
+        ;;
+    *)
+        echo "usage: $0 {start|stop|restart}" >&2
+        exit 2
+        ;;
+esac
