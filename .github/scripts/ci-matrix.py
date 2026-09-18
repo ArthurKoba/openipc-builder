@@ -68,6 +68,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 # leaves a name describing nothing and --self-test says so. Changes to these
 # narrow to nothing, exactly as they do today.
 NOT_BUILT = {
+    # Cross-repository staging: its generic FH8626 Firmware base is not in
+    # OpenIPC/firmware yet, so the normal Builder clone cannot build it.
+    "fh8626v100_lite_anjia-ajl33pq0866",
     "gk7102ca_lite_umea-qc01x", "gk7102ca_lite_vstarcam-g8896wip",
     "gk7205v200_rubyfpv_generic", "hi3518ev200_lite_lenovo-snowman-1080p",
     "t31_lite_xiaomi-mjsxj05hl",

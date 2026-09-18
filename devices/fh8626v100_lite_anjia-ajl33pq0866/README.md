@@ -32,4 +32,6 @@ workflow still clones `OpenIPC/firmware`; therefore this staging profile becomes
 directly buildable through the normal Builder path only after the clean Firmware
 integration is available from the Firmware source Builder consumes.
 
+The device is temporarily listed in Builder CI `NOT_BUILT` for the same cross-repository reason; remove that opt-out when the required Firmware base is available through the normal Builder clone.
+
 No build or hardware acceptance is implied by this source-only staging profile.
