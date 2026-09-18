@@ -5,10 +5,9 @@ of the clean FH8626V100 Firmware/Linux split.
 
 Cross-repository staging dependencies:
 
-- Firmware: `ArthurKoba/openipc-firmware/rework/fh8626v100-clean-integration@f9146dd42a2f606d305ebccd301268848de26880`;
-- Linux: `ArthurKoba/openipc-linux/rework/fh8626v100-final-series@357c2d13e7589db0dbe2bbf89c2ec38b1c036e6e`;
-- Divinus implementation remains owned by the Divinus repository and is not
-  patched or copied here.
+- Firmware core: `ArthurKoba/openipc-firmware/work/fh8626v100@eabd1ccd4684af6997771269c4655f7e4435bcec`;
+- Linux: `ArthurKoba/openipc-linux/work/fh8626v100@357c2d13e7589db0dbe2bbf89c2ec38b1c036e6e`;
+- Divinus implementation: `ArthurKoba/openipc-divinus/work/fh8626v100@1e624bd5aca97ba772413d2b00a10314d1db039f`; it is selected by this device defconfig but is not patched or copied here.
 
 The profile keeps only named-device deltas: the ANJIA kernel fragment, RTL8188FU
 selection, microSD policy, device GPIO/illumination configuration and
@@ -27,11 +26,13 @@ or patch. Those belong respectively to Firmware/Linux, evidence/provenance work
 and Divinus.
 
 The exact Linux tarball URL is a temporary engineering pin to the ArthurKoba
-fork until the curated series lands in `OpenIPC/linux`. The default Builder
-workflow still clones `OpenIPC/firmware`; therefore this staging profile becomes
-directly buildable through the normal Builder path only after the clean Firmware
-integration is available from the Firmware source Builder consumes.
+fork until the curated series lands in `OpenIPC/linux`. `builder.sh` supports
+`OPENIPC_FW_REPO` and `OPENIPC_FW_REV`, so this staging profile can be built
+against the fork-local Firmware core without copying generic FH8626 code into
+Builder. The ordinary no-override path still clones upstream `OpenIPC/firmware`.
 
-The device is temporarily listed in Builder CI `NOT_BUILT` for the same cross-repository reason; remove that opt-out when the required Firmware base is available through the normal Builder clone.
+The device remains temporarily listed in Builder CI `NOT_BUILT` because normal
+CI does not consume the fork-local Firmware core. Remove that opt-out only when
+the required Firmware state is available through the normal CI clone path.
 
 No build or hardware acceptance is implied by this source-only staging profile.
