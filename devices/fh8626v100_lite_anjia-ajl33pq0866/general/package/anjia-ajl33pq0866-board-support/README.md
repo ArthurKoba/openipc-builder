@@ -1,7 +1,8 @@
 # ANJIA AJL33PQ0866 board support
 
-This package contains only low-level hardware backends that are specific to the
-ANJIA AJL33PQ0866 board.
+This device-local package contains the executable hardware backends that are
+specific to the ANJIA AJL33PQ0866 board. It is copied and registered only when
+this named device is selected; unrelated Builder targets never see it.
 
 ## PTZ motor backend
 
@@ -84,3 +85,12 @@ Run the retained host recorder tests before target work:
 ```text
 make -C src clean test
 ```
+
+
+## Illumination / IR-cut helper
+
+The package also installs the runtime-neutral physical helper for IR LED GPIO25,
+white LED GPIO23 with the shared SADC1 pad, and the GPIO18/GPIO60 IR-cut
+actuator. It does not implement AUTO/DAY/NIGHT/WLIGHT media policy. The
+`S68anjia-hardware` init hook only establishes safe electrical outputs at boot
+and shutdown.

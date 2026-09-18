@@ -112,22 +112,50 @@ validate_build_environment() {
     fi
 }
 
+register_package_tree() {
+    package_root="$1"
+    package_list_file="${FIRMWARE_DIR}/general/package/Config.in"
+
+    [ -d "$package_root" ] || return 0
+
+    for f in "$package_root"/*; do
+        [ -d "$f" ] || continue
+        [ -f "$f/Config.in" ] || continue
+        package_name=$(basename "$f")
+        source_line="source \"\$BR2_EXTERNAL_GENERAL_PATH/package/$package_name/Config.in\""
+        if ! grep -Fqx "$source_line" "$package_list_file"; then
+            printf '%s\n' "$source_line" >> "$package_list_file" || return 1
+        fi
+    done
+}
+
+validate_device_packages() {
+    device_packages="${BUILDER_DIR}/${ITEM}/general/package"
+    global_packages="${BUILDER_DIR}/package"
+
+    [ -d "$device_packages" ] || return 0
+
+    for f in "$device_packages"/*; do
+        [ -d "$f" ] || continue
+        package_name=$(basename "$f")
+        if [ -d "$global_packages/$package_name" ]; then
+            echo_c 31 "Device package collides with global package: $package_name"
+            exit 2
+        fi
+        if [ ! -f "$f/Config.in" ]; then
+            echo_c 31 "Device package has no Config.in: $f"
+            exit 2
+        fi
+    done
+}
+
 copy_extra_packages() {
     extra_package="${BUILDER_DIR}/package"
     firmware_package="${FIRMWARE_DIR}/general/package"
-    package_list_file="${firmware_package}/Config.in"
 
     [ -d "$extra_package" ] || return 0
     cp -afv "${extra_package}/." "$firmware_package/" || return 1
-
-    for f in "$extra_package"/*; do
-        [ -d "$f" ] || continue
-        package_name=$(basename "$f")
-        if ! grep -Fq "$package_name" "$package_list_file"; then
-            printf 'source "$BR2_EXTERNAL_GENERAL_PATH/package/%s/Config.in"\n' \
-                "$package_name" >> "$package_list_file" || return 1
-        fi
-    done
+    register_package_tree "$extra_package"
 }
 
 echo_c 37 "Experimental system for building OpenIPC firmware for known devices"
@@ -140,6 +168,7 @@ done
 
 resolve_device
 validate_build_environment
+validate_device_packages
 
 echo_c 31 "\nStarting a device for ${DEVICE}"
 tree -C "${ITEM}"
@@ -165,6 +194,9 @@ copy_extra_packages || exit 1
 
 echo_c 33 "\nCopying device files"
 cp -afv "${BUILDER_DIR}/${ITEM}/." "$FIRMWARE_DIR/" || exit 1
+
+echo_c 33 "\nRegistering device-local packages"
+register_package_tree "${BUILDER_DIR}/${ITEM}/general/package" || exit 1
 
 cd "$FIRMWARE_DIR" || exit 1
 
