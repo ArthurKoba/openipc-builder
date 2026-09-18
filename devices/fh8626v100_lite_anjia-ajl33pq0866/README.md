@@ -68,7 +68,7 @@ metadata automatically, so the normal staging commands are simply:
 `OPENIPC_FW_REPO` / `OPENIPC_FW_REV` remain explicit overrides for bisect
 or debugging; they are not required for these three named variants.
 
-The composed config and source provenance are archived with a successful build.
+The composed config and source provenance are archived with a successful build. Builder now also writes `runtime-sha256.txt`, records `majestic_sha256` in `build-info.txt`, and emits archive-level `SHA256SUMS`, so the moving Majestic donor and the pinned FH8626 runtime bytes are attributable to the exact image.
 
 ## Shared proprietary media kernel runtime
 
@@ -210,9 +210,9 @@ Before flashing a persistent image:
 
 1. build the exact Majestic composed target;
 2. record the resolved Builder/Firmware/Linux refs;
-3. verify the external media payload SHA-256 checks pass;
+3. verify the external media payload SHA-256 checks pass and retain the generated runtime/archive checksum manifests;
 4. require `uImage <= 2048 KiB`;
-5. require `rootfs.squashfs <= 5120 KiB` and record headroom;
+5. require `rootfs.squashfs <= 5120 KiB` and record headroom; Builder now enforces both FH8626 limits as hard post-build gates before archiving;
 6. inspect the final target for all nine media runtime artifacts and
    `/usr/bin/load_fullhan`;
 7. boot non-destructively first where practical;
