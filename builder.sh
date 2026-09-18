@@ -13,6 +13,7 @@
 DEVICE="$1"
 BUILDER_DIR=$(pwd)
 FIRMWARE_DIR="${BUILDER_DIR}/openipc"
+OPENIPC_FW_REPO="${OPENIPC_FW_REPO:-https://github.com/OpenIPC/firmware.git}"
 TIMESTAMP=$(date +"%Y%m%d%H%M")
 VERSION=$(stat -c"%Y" $0)
 
@@ -150,8 +151,12 @@ echo_c 30 "Version: ${VERSION}"
 while [ -z "${DEVICE}" ]; do select_device; done
 
 echo_c 31 "\nStarting a device for ${DEVICE}"
-ITEM=$(find devices -name ${DEVICE}_defconfig | cut -d/ -f1,2)
-tree -C "${ITEM}"
+ITEM=$(find devices -name "${DEVICE}_defconfig" -print -quit | cut -d/ -f1,2)
+if [ -n "${ITEM}" ]; then
+    tree -C "${ITEM}"
+else
+    echo_c 33 "No builder device overlay for ${DEVICE}; using the firmware board directly"
+fi
 
 sleep 3
 
@@ -168,11 +173,11 @@ rm -rf openipc
 if [ ! -d "$FIRMWARE_DIR" ]; then
     if [ -n "$OPENIPC_FW_REV" ]; then
         echo_c 33 "\nDownloading Firmware @ ${OPENIPC_FW_REV}"
-        git clone https://github.com/OpenIPC/firmware.git "$FIRMWARE_DIR"
+        git clone "$OPENIPC_FW_REPO" "$FIRMWARE_DIR"
         git -C "$FIRMWARE_DIR" checkout "$OPENIPC_FW_REV"
     else
         echo_c 33 "\nDownloading Firmware"
-        git clone --depth=1 https://github.com/OpenIPC/firmware.git "$FIRMWARE_DIR"
+        git clone --depth=1 "$OPENIPC_FW_REPO" "$FIRMWARE_DIR"
     fi
     cd "$FIRMWARE_DIR"
 else
@@ -185,8 +190,10 @@ fi
 echo_c 33 "\nCopying extra packages"
 copy_extra_packages
 
-echo_c 33 "\nCopying device files"
-cp -afv ${BUILDER_DIR}/${ITEM}/* ${FIRMWARE_DIR}
+if [ -n "${ITEM}" ]; then
+    echo_c 33 "\nCopying device files"
+    cp -afv ${BUILDER_DIR}/${ITEM}/* ${FIRMWARE_DIR}
+fi
 
 echo_c 33 "\nBuilding the device"
 # Propagate make's status. Without this the script ALWAYS exits 0: the result is
