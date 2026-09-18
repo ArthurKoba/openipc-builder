@@ -11,7 +11,7 @@ Current audited staging directions:
 - Builder: `ArthurKoba/openipc-builder/work/fh8626v100-anjia` (record the exact HEAD from build provenance; this README is part of that branch);
 - Firmware core: `ArthurKoba/openipc-firmware/work/fh8626v100@80169887`;
 - Firmware Divinus: `ArthurKoba/openipc-firmware/work/fh8626v100-divinus@255b8c8d`;
-- Firmware Majestic: `ArthurKoba/openipc-firmware/work/fh8626v100-majestic@04e09360`;
+- Firmware Majestic: `ArthurKoba/openipc-firmware/work/fh8626v100-majestic@cf4c6c47`;
 - Linux: `ArthurKoba/openipc-linux/work/fh8626v100@357c2d13`;
 - Divinus: `ArthurKoba/openipc-divinus/work/fh8626v100@44c4fb94`;
 - production U-Boot direction: `ArthurKoba/u-boot-fullhan/fh8626v100-mainline@7ac0aa7e`.
