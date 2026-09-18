@@ -71,7 +71,9 @@ jobs:
           echo "BR2_DL_DIR=/runner/cache/buildroot-dl" >> "${GITHUB_ENV}"
 
           REMOTE='${{ inputs.firmware_repo }}'
+          REF='${{ inputs.firmware_ref }}'
           KEY=$(printf '%s' "$REMOTE" | sha256sum | cut -c1-16)
+          OUTPUT_KEY=$(printf '%s\n%s' "$REMOTE" "$REF" | sha256sum | cut -c1-16)
           MIRROR="/runner/cache/git/firmware-${KEY}.git"
           if [ -d "$MIRROR" ]; then
             git --git-dir="$MIRROR" remote set-url origin "$REMOTE"
@@ -80,6 +82,7 @@ jobs:
             git clone --mirror "$REMOTE" "$MIRROR"
           fi
           echo "OPENIPC_FW_REPO=$MIRROR" >> "${GITHUB_ENV}"
+          echo "OPENIPC_OUTPUT_ROOT=/runner/cache/buildroot-output/${OUTPUT_KEY}" >> "${GITHUB_ENV}"
 
       - name: Refresh moving-ref package downloads
         run: |
@@ -99,7 +102,6 @@ jobs:
           BUILD_SHA:      ${{ needs.resolve.outputs.ref }}
           BUILD_PLATFORM: ${{ inputs.platform }}
           OPENIPC_FW_REV: ${{ inputs.firmware_ref }}
-          OPENIPC_OUTPUT_ROOT: /runner/cache/buildroot-output
           OPENIPC_REBUILD_PACKAGES: ${{ inputs.rebuild_packages }}
           OPENIPC_CLEAN_OUTPUT: ${{ inputs.clean_output }}
         run: |
