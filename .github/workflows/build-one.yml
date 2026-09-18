@@ -11,6 +11,15 @@ on:
       firmware_ref:
         description: 'OpenIPC/firmware ref (SHA/tag/branch) to clone — for cross-repo bisect of size/regression issues. Defaults to firmware HEAD.'
         required: false
+      rebuild_packages:
+        description: 'Comma-separated packages to rebuild from source while keeping the persistent Buildroot output.'
+        required: false
+        default: 'divinus'
+      clean_output:
+        description: 'Discard the persistent Buildroot output for this platform before building.'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   resolve:
@@ -51,6 +60,7 @@ jobs:
         run: |
           mkdir -p /runner/cache/ccache
           mkdir -p /runner/cache/buildroot-dl
+          mkdir -p /runner/cache/buildroot-output
           rm -rf "${HOME}/.ccache"
           ln -s /runner/cache/ccache "${HOME}/.ccache"
           echo "BR2_DL_DIR=/runner/cache/buildroot-dl" >> "${GITHUB_ENV}"
@@ -73,6 +83,9 @@ jobs:
           BUILD_SHA:      ${{ needs.resolve.outputs.ref }}
           BUILD_PLATFORM: ${{ inputs.platform }}
           OPENIPC_FW_REV: ${{ inputs.firmware_ref }}
+          OPENIPC_OUTPUT_ROOT: /runner/cache/buildroot-output
+          OPENIPC_REBUILD_PACKAGES: ${{ inputs.rebuild_packages }}
+          OPENIPC_CLEAN_OUTPUT: ${{ inputs.clean_output }}
         run: |
           export GIT_HASH=$(git rev-parse --short ${GITHUB_SHA})
           export GIT_BRANCH=${GITHUB_REF_NAME}
