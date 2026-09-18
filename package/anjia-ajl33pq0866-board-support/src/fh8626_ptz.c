@@ -331,11 +331,24 @@ fail:
     return -1;
 }
 
-static int run_move(int pan_steps, int tilt_steps)
+static int run_move(int pan_steps, int tilt_steps, uint32_t requested_ns)
 {
-    if (run_axis_steps_at(&axes[0], pan_steps, axes[0].normal_ns))
+    uint32_t pan_ns = requested_ns ? requested_ns : axes[0].normal_ns;
+    uint32_t tilt_ns = requested_ns ? requested_ns : axes[1].normal_ns;
+
+    if (run_axis_steps_at(&axes[0], pan_steps, pan_ns))
         return -1;
-    return run_axis_steps_at(&axes[1], tilt_steps, axes[1].normal_ns);
+    return run_axis_steps_at(&axes[1], tilt_steps, tilt_ns);
+}
+
+static int parse_delay_ms(const char *text, uint32_t *requested_ns)
+{
+    int delay_ms;
+
+    if (parse_int(text, &delay_ms) || delay_ms < 0 || delay_ms > 1000)
+        return -1;
+    *requested_ns = delay_ms ? (uint32_t)delay_ms * 1000000U : 0;
+    return 0;
 }
 
 static int acquire(void)
@@ -369,7 +382,8 @@ static int busy(void)
 #ifndef FH8626_PTZ_TEST
 static void usage(const char *program)
 {
-    fprintf(stderr, "usage: %s status | move PAN_STEPS TILT_STEPS\n", program);
+    fprintf(stderr, "usage: %s status | move PAN_STEPS TILT_STEPS [DELAY_MS]\n",
+            program);
 }
 
 static void enable_motor_realtime(void)
@@ -386,6 +400,7 @@ static void enable_motor_realtime(void)
 int main(int argc, char **argv)
 {
     int pan, tilt, rc;
+    uint32_t requested_ns = 0;
 
     load_board_config();
 
@@ -394,8 +409,9 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    if (argc != 4 || strcmp(argv[1], "move") ||
-        parse_int(argv[2], &pan) || parse_int(argv[3], &tilt)) {
+    if ((argc != 4 && argc != 5) || strcmp(argv[1], "move") ||
+        parse_int(argv[2], &pan) || parse_int(argv[3], &tilt) ||
+        (argc == 5 && parse_delay_ms(argv[4], &requested_ns))) {
         usage(argv[0]);
         return 2;
     }
@@ -409,7 +425,7 @@ int main(int argc, char **argv)
     if (acquire())
         return errno == EBUSY ? 2 : 1;
 
-    rc = run_move(pan, tilt);
+    rc = run_move(pan, tilt, requested_ns);
     return rc ? 1 : 0;
 }
 #endif

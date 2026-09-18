@@ -136,7 +136,7 @@ static void test_relative_move_is_serial_and_stateless(void)
     int enables = 0, waits = 0;
 
     reset(&recorder);
-    CHECK(run_move(2, 1) == 0);
+    CHECK(run_move(2, 1, 5000000U) == 0);
 
     for (i = 0; i < recorder.count; i++) {
         struct event *event = &recorder.events[i];
@@ -157,9 +157,13 @@ static void test_relative_move_is_serial_and_stateless(void)
     CHECK(first_tilt > first_pan);
     CHECK(enables == 3);
     CHECK(waits == 3);
+    CHECK(recorder.events[first_pan].config.period_ns ==
+          4 * (5000000U - 70000U));
+    CHECK(recorder.events[first_tilt].config.period_ns ==
+          4 * (5000000U - 70000U));
 
     reset(&recorder);
-    CHECK(run_move(0, 0) == 0);
+    CHECK(run_move(0, 0, 0) == 0);
     CHECK(motion_events(&recorder) == 0);
 }
 

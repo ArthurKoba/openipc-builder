@@ -1,11 +1,10 @@
 #!/bin/sh
 
-# OpenIPC relative motor interface. FH8626 movement timing comes from the
-# hardware-PWM board parameters; DELAY_MS is accepted only for compatibility
-# with the standard gpio-motors command signature.
+# Standard OpenIPC relative motor interface. A positive DELAY_MS becomes the
+# nominal FH8626 PWM step period; zero keeps the board's proven default timing.
 if [ "$#" -ne 3 ]; then
     echo "usage: gpio-motors PAN_STEPS TILT_STEPS DELAY_MS" >&2
     exit 2
 fi
 
-exec /usr/sbin/fh8626-ptz move "$1" "$2"
+exec /usr/sbin/fh8626-ptz move "$1" "$2" "$3"

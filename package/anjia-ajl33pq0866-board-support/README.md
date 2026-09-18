@@ -29,16 +29,17 @@ The OpenIPC-facing entry point is the standard relative interface:
 gpio-motors PAN_STEPS TILT_STEPS DELAY_MS
 ```
 
-The shim forwards relative pan/tilt steps to `fh8626-ptz move`. The generic
-delay argument is accepted for interface compatibility but is not used: this
-board's hardware PWM period comes from the board/stock timing parameters rather
-than userspace GPIO sleeps.
+The shim forwards relative pan/tilt steps and the standard delay argument to
+`fh8626-ptz move`. A positive delay becomes the nominal hardware-PWM period
+for both axes. Delay 0 keeps the board's proven per-axis defaults. This preserves
+the OpenIPC speed-control semantics without replacing hardware PWM with
+userspace GPIO sleeps.
 
 Commands:
 
 ```text
 fh8626-ptz status
-fh8626-ptz move PAN_STEPS TILT_STEPS
+fh8626-ptz move PAN_STEPS TILT_STEPS [DELAY_MS]
 ```
 
 No PTZ init service is installed. Boot leaves the camera where it physically is.
