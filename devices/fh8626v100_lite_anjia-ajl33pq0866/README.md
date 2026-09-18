@@ -1,185 +1,214 @@
 # FH8626V100 ANJIA AJL33PQ0866 device profile
 
-This directory is the named-camera layer for ANJIA AJL33PQ0866. It is intentionally
-thin: generic FH8626V100 implementation is supplied by Firmware/Linux and streamer
-implementation is supplied by Divinus or Majestic.
+This directory is the named-camera assembly layer for ANJIA AJL33PQ0866.
+Generic FH8626V100 implementation is supplied by Firmware/Linux; runtime
+implementation is supplied by Divinus or the Majestic compatibility package.
+
+## Pre-deploy repository set
+
+Current audited staging directions:
+
+- Builder: `ArthurKoba/openipc-builder/work/fh8626v100-anjia@e0060afb`;
+- Firmware core: `ArthurKoba/openipc-firmware/work/fh8626v100@80169887`;
+- Firmware Divinus: `ArthurKoba/openipc-firmware/work/fh8626v100-divinus@255b8c8d`;
+- Firmware Majestic: `ArthurKoba/openipc-firmware/work/fh8626v100-majestic@527e3d8b`;
+- Linux: `ArthurKoba/openipc-linux/work/fh8626v100@357c2d13`;
+- Divinus: `ArthurKoba/openipc-divinus/work/fh8626v100@6860cb9b`;
+- production U-Boot direction: `ArthurKoba/u-boot-fullhan/fh8626v100-mainline@7ac0aa7e`.
+
+The exact Linux tarball remains pinned by commit in the Firmware defconfig.
 
 ## Repository boundary
 
-Builder owns only AJL33PQ0866 policy and assembly. Its executable board
-support packages live under this device tree, so unrelated Builder targets do
-not even register them:
+Builder owns only board policy and composition:
 
-- the board-only kernel fragment, including one-bit SD0 and this board's
-  RTC/TSENSOR disable policy;
-- RTL8188FU selection and persistent first-boot device settings;
-- the physical GPIO map and the GPIO23/SADC1 shared-pad policy;
-- illumination/IR-cut low-level helpers and safe output handling;
-- source-built AJL33PQ0866 PTZ and WIDE/TELE low-level backends;
-- removable-storage shutdown policy;
-- runtime selection and runtime-specific named-device configuration.
+- board-only kernel fragment: one-bit SD0 plus RTC/TSENSOR board disable;
+- RTL8188FU selection;
+- persistent device/update identity;
+- GPIO and GPIO23/SADC1 shared-pad policy;
+- source-built PTZ and low-level WIDE/TELE selector;
+- physical illumination/IR-cut and speaker-mute helpers;
+- storage policy;
+- runtime selection and runtime-specific board configuration.
 
-Builder does not contain generic FH8626 kernel/platform/media code, Linux
-patches, factory Fullhan .ko/.so/.bin payloads, Divinus implementation source or
-the Majestic compatibility package.
+Builder does **not** contain generic FH8626 platform/media implementation,
+proprietary media kernel binaries, Divinus source, or the Majestic
+compatibility implementation.
 
-Current cross-repository staging inputs are:
-
-- Firmware core: `ArthurKoba/openipc-firmware/work/fh8626v100@eabd1ccd4684af6997771269c4655f7e4435bcec`;
-- Linux: `ArthurKoba/openipc-linux/work/fh8626v100@357c2d13e7589db0dbe2bbf89c2ec38b1c036e6e`;
-- Divinus implementation: `ArthurKoba/openipc-divinus/work/fh8626v100@f986a82f309b8794a5aae251589c6a5d07690c53`.
-
-The exact Linux tarball in the defconfig is a temporary engineering pin until
-the curated Linux series has an OpenIPC-owned ref.
+The still-proprietary FH8626 kernel media ABI is owned by Firmware package
+`fullhan-media-fh8626v100`. Active source branches contain only package
+metadata, loader scripts and SHA-256 manifests. The eight hardware-proven
+media modules plus `rtthread_arc.bin` are downloaded from immutable archive
+commit `f4bf49da6ef355c9e733e00d774efe403513b1d4`; they are not copied into
+the current Builder/Firmware source trees.
 
 ## Runtime targets
 
-ANJIA uses composed runtime variants instead of copied full defconfigs.
+Targets are composed from:
 
-Shared Buildroot/device selections live once in:
+1. Firmware base `br-ext-chip-fullhan/configs/fh8626v100_lite_defconfig`;
+2. Builder `configs/variants/base.config`;
+3. one runtime fragment.
 
-`br-ext-chip-fullhan/configs/variants/base.config`
+Available targets:
 
-Each selectable target has a short fragment beside it:
+- `fh8626v100_lite_anjia-ajl33pq0866_divinus`;
+- `fh8626v100_lite_anjia-ajl33pq0866_majestic`;
+- `fh8626v100_lite_anjia-ajl33pq0866_diag`.
 
-- `fh8626v100_lite_anjia-ajl33pq0866_divinus.config` — Divinus development/runtime;
-- `fh8626v100_lite_anjia-ajl33pq0866_majestic.config` — experimental Majestic compatibility runtime;
-- `fh8626v100_lite_anjia-ajl33pq0866_diag.config` — streamer-free board diagnostics for PTZ, lens, illumination, storage and networking.
-
-`builder.sh` discovers these fragments as normal selectable targets, composes
-`base.config + <target>.config` into the Firmware checkout, and removes the
-Builder-only composition metadata before invoking Firmware. No GPIO, Wi-Fi,
-microSD, kernel fragment, PTZ backend or illumination file is copied between
-runtime variants.
-
-Build the current staging directions explicitly:
+Each target has a sibling `.firmware` metadata file. `builder.sh` uses that
+metadata automatically, so the normal staging commands are simply:
 
 ```sh
-OPENIPC_FW_REPO=https://github.com/ArthurKoba/openipc-firmware.git
-OPENIPC_FW_REV=work/fh8626v100-divinus
 ./builder.sh fh8626v100_lite_anjia-ajl33pq0866_divinus
-```
-
-```sh
-OPENIPC_FW_REPO=https://github.com/ArthurKoba/openipc-firmware.git
-OPENIPC_FW_REV=work/fh8626v100-majestic
 ./builder.sh fh8626v100_lite_anjia-ajl33pq0866_majestic
-```
-
-```sh
-OPENIPC_FW_REPO=https://github.com/ArthurKoba/openipc-firmware.git
-OPENIPC_FW_REV=work/fh8626v100
 ./builder.sh fh8626v100_lite_anjia-ajl33pq0866_diag
 ```
 
-The Divinus fragment selects Divinus plus the small
-`anjia-ajl33pq0866-divinus-config` package. Its current acceptance YAML starts
-only the 1280x720@25 H.264 path; RTX audio and JPEG/MJPEG remain disabled until
-their own gates pass.
+`OPENIPC_FW_REPO` / `OPENIPC_FW_REV` remain explicit overrides for bisect
+or debugging; they are not required for these three named variants.
 
-The Majestic fragment selects only the Firmware-owned
-`BR2_PACKAGE_MAJESTIC_FH8852V200_COMPAT` compatibility package. No Divinus
-configuration is installed.
+The composed config and source provenance are archived with a successful build.
 
-The diagnostic fragment selects no streamer at all. It intentionally keeps the
-shared board-support package so low-level board functions can be exercised
-without a media owner. It has no update target, so a NOR diagnostic boot does
-not replace the camera's persistent self-update direction.
+## Shared proprietary media kernel runtime
 
-Each runtime image embeds its exact target in `/etc/openipc/builder-target`.
-Normal runtime variants also embed `/etc/openipc/update-target`.
-`S32anjia-env` validates these values on every NOR boot and only changes U-Boot
-environment variables when needed. TFTP/initramfs validation never mutates the
-persistent environment.
+All three Firmware directions select
+`BR2_PACKAGE_FULLHAN_MEDIA_FH8626V100=y`.
 
-All three targets remain explicit CI `NOT_BUILT` entries while their required
-FH8626 Firmware directions are fork-local.
+The package installs:
 
-The former separate Builder Majestic branch was retired after this composition
-model landed. Its pre-consolidation state is preserved only as
-`archive/fh8626v100-anjia-majestic-branch-20260918`.
+- `vmm.ko`;
+- `xbus_rpc.ko`;
+- `media_process.ko`;
+- `isp.ko`;
+- `enc.ko`;
+- `jpeg.ko`;
+- `bgm.ko`;
+- `gpio_wave.ko`;
+- `rtthread_arc.bin`.
 
-## PTZ
+OpenIPC `S70vendor` calls the installed `load_fullhan -i`, which delegates
+to the pinned FH8626 loader. The hardware-proven load order is VMM, ARC/XBUS,
+media_process, ISP, encoder, JPEG, BGM and gpio_wave. The loader fails when
+`/dev/vmm_userdev`, `/dev/media_process`, `/dev/isp`, `/dev/pae` or
+`/dev/jpeg` is missing.
 
-Production PTZ is a stateless relative backend over the hardware-proven
-`/dev/fh_pwm` channel map. It exposes the normal OpenIPC interface:
+Sensor/MIPI userspace is not supplied by this binary package. Majestic and
+Divinus own their current source/runtime paths independently.
+
+## Majestic target
+
+The Majestic variant selects only
+`BR2_PACKAGE_MAJESTIC_FH8852V200_COMPAT` plus shared board/runtime packages.
+It does not install Divinus configuration.
+
+Default boot remains the proven media-off Majestic control plane.
+
+For staged hardware acceptance the image includes
+`majestic-fh8626-full-run`, which runs native VENC with permissive stubs
+disabled and enables together:
+
+- H.264 main 1280x720@25;
+- H.264 sub 640x360@25;
+- JPEG 640x384;
+- OSD;
+- motion;
+- 8 kHz audio capture/output;
+- RTSP;
+- recovered ANJIA day/night wiring.
+
+Majestic HTTP/WebUI remains native. There is no HTTP proxy or JavaScript patch.
+
+## Divinus target
+
+The Divinus variant selects Divinus plus the device-local
+`anjia-ajl33pq0866-divinus-config` package.
+
+The current Builder acceptance YAML deliberately starts with the proven
+1280x720@25 H.264 path. Audio and JPEG/MJPEG remain disabled in that YAML even
+though the implementation has advanced further; they are later target gates,
+not missing Builder ownership.
+
+## Diagnostic target
+
+The diagnostic variant selects no streamer. It keeps board support plus the
+shared FH8626 media runtime for low-level diagnostics. It has no persistent
+update target, so a diagnostic NOR/TFTP session does not redirect normal
+self-update policy.
+
+## U-Boot and NOR layout
+
+Builder does not build or flash the FH8626 U-Boot port.
+
+Production U-Boot is a separate artifact from
+`u-boot-fullhan/fh8626v100-mainline`. Its native OpenIPC 8 MiB layout is:
+
+- boot: 256 KiB;
+- env: 64 KiB;
+- kernel: 2048 KiB;
+- rootfs: 5120 KiB;
+- remaining NOR: rootfs_data.
+
+The Builder/Firmware image uses the same kernel/rootfs limits. A first Majestic
+userspace/media test may use an already-working bootloader, but migration to
+the new native U-Boot artifact is a separate cold-boot/recovery hardware gate.
+
+`/etc/fw_env.config` points at the 64 KiB env partition:
+`/dev/mtd1 0x0000 0x10000 0x10000`.
+
+## Board hardware contracts
+
+### PTZ and lens
+
+PTZ uses the source-built relative `/dev/fh_pwm` backend and exposes:
 
 `gpio-motors PAN_STEPS TILT_STEPS DELAY_MS`
 
-There is no automatic calibration, boot movement, saved absolute coordinate,
-`home` or `goto` state. This hardware has no absolute position feedback, so a
-coordinate saved across power loss is not authoritative physical position.
+No boot calibration or persistent absolute position is claimed.
 
-The earlier stock-style controller remains reference/evidence only at tag
-`archive/fh8626v100-anjia-stock-ptz-controller-20260918`.
+The WIDE/TELE helper owns only GPIO4/GPIO14. A media runtime owns the complete
+logical switch around that physical selector.
 
-PTZ and lens switching are separate. `fh8626-lens` owns only the physical
-GPIO4/GPIO14 selector and stock target-first ordering. A streamer/media owner
-must coordinate VENC, orientation and exposure around a logical WIDE/TELE
-switch.
+Cold TELE visibility has the separate GPIO5 bootstrap requirement: LOW before
+media-module initialization and HIGH before sensor/media startup.
 
-## Dual-sensor bootstrap
+### Illumination / IR-cut
 
-TELE visibility after cold boot has a separate hardware prerequisite: GPIO5
-must be LOW before the validated Fullhan media-module initialization sequence
-and HIGH before sensor/media startup.
+Hardware contract:
 
-That transaction cannot be reproduced correctly by an unrelated early/late
-Builder init script. Builder records the board contract; the selected media
-runtime must place the two edges around its actual media initialization. GPIO5
-is not toggled on ordinary WIDE/TELE switches.
+- IR-cut DAY coil: GPIO18;
+- IR-cut NIGHT coil: GPIO60;
+- pulse: 190 ms;
+- IR LED: GPIO25 active high;
+- white LED: GPIO23 active high;
+- light input: SADC1 on the GPIO23 shared pad.
 
-## Illumination and IR-cut
+Board init establishes only safe outputs. Runtime scene policy belongs to the
+selected streamer.
 
-Board wiring is:
+### Audio amplifier
 
-- IR LED GPIO25, active high;
-- white LED GPIO23, active high;
-- IR-cut actuator GPIO18/GPIO60;
-- light input SADC channel 1, sharing pad70 with white-light GPIO23.
+GPIO24 is the active-high physical speaker-amplifier mute. Board boot/shutdown
+keeps it muted. Media runtimes must unmute only after AO is configured and mute
+before AO teardown. Majestic uses the board-neutral lifecycle hook for this.
 
-`fh-anjia-ajl33pq0866-light` owns only these physical operations. AUTO
-hysteresis, day/night/WLIGHT scene choice and ISP transitions belong to the
-selected media runtime. `S68anjia-hardware` only establishes safe outputs at
-boot/shutdown: LEDs off, pad70 returned to SADC and both IR-cut drive lines at
-rest; it does not move the filter merely because the process starts or stops.
+## Build and deployment gates
 
-The current IR-cut active/rest values are retained from the already-staged
-working helper. Their final polarity/actuator direction is an explicit hardware
-regression gate; do not silently infer it from GPIO numbering.
+The source/composition audit is not a successful build.
 
-## Storage and identity
+Before flashing a persistent image:
 
-The one-bit SD0 slot is selected with
-`CONFIG_FH8626V100_SD0_1BIT=y`. Generic OpenIPC mdev owns hotplug mounting;
-the device init script only creates the recording directory when a card is
-already mounted and syncs/unmounts it on shutdown.
+1. build the exact Majestic composed target;
+2. record the resolved Builder/Firmware/Linux refs;
+3. verify the external media payload SHA-256 checks pass;
+4. require `uImage <= 2048 KiB`;
+5. require `rootfs.squashfs <= 5120 KiB` and record headroom;
+6. inspect the final target for all nine media runtime artifacts and
+   `/usr/bin/load_fullhan`;
+7. boot non-destructively first where practical;
+8. prove media devices after `S70vendor`;
+9. run Majestic ABI probe and then `majestic-fh8626-full-run`;
+10. only after media acceptance proceed to persistent/update/U-Boot migration.
 
-`fw_env.config` addresses the native OpenIPC 64 KiB environment partition as
-`/dev/mtd1`. The customizer does not overwrite serial/cid/uuid/ethaddr. It
-sets the board-qualified update URL and the RTL8188FU runtime profile only when
-the module is actually present.
-
-The composed base still contains architecture/toolchain/kernel selection
-because Firmware expects a complete Buildroot defconfig after composition.
-Those lines select the shared Firmware/Linux implementation; streamer-specific
-choices are not repeated there.
-
-## Validation state
-
-Source-level checks for the cleaned board-support code pass, including the PTZ
-recorder tests and warning-clean host compilation. This is not hardware
-acceptance.
-
-Remaining owner gates are:
-
-- build all three composed targets against their exact Firmware directions and
-  record the resolved config plus kernel/rootfs sizes;
-- cold-boot GPIO5 dual-sensor bootstrap and WIDE/TELE switching;
-- relative pan/tilt direction, requested delay/speed, cancellation and safe
-  output disable with no boot movement;
-- IR/white LED, IR-cut DAY/NIGHT direction/polarity, SADC shared-pad restore and
-  shutdown safe state;
-- microSD hotplug/shutdown, RTL8188FU, reset-button path and persistent U-Boot
-  settings;
-- streamer-specific media/audio acceptance in the owning Divinus/Majestic path.
+All three named targets remain CI `NOT_BUILT` while these fork-local staging
+directions are not part of normal upstream CI.
