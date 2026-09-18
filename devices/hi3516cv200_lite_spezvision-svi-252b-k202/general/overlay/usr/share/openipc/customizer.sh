@@ -6,12 +6,21 @@
 # Sensor: Sony IMX323, I2C/DC
 # Flash: 8 MiB SPI NOR
 #
-# IR-cut, IR LED and light-sensor GPIOs are intentionally left unset until
-# they are measured on this exact board. Do not reuse GPIOs from other CV200
-# devices here.
+# Stock Sofia encodes legacy HiSilicon GPIOs as bank * 8 + bit:
+# GPIO6_6 = 54, GPIO7_3 = 59, GPIO8_0 = 64.
+# The IR LED call path is not yet resolved between GPIO8_1 (65) and GPIO0_2 (2),
+# so backlightPin is intentionally not configured yet.
 #
 
 fw_setenv upgrade 'https://github.com/OpenIPC/builder/releases/download/latest/hi3516cv200_lite_spezvision-svi-252b-k202-nor.tgz'
 fw_setenv sensor imx323
+
+cli -s .isp.sensorConfig /etc/sensors/imx323_i2c_dc_1080p.ini
+cli -s .nightMode.lightSensorPin 54
+cli -s .nightMode.lightMonitor false
+cli -s .nightMode.irCutPin1 64
+cli -s .nightMode.irCutPin2 59
+cli -s .video0.codec h264
+cli -s .video0.fps 25
 
 exit 0
