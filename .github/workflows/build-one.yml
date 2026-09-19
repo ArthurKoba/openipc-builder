@@ -8,9 +8,22 @@ on:
       commit:
         description: 'Builder commit SHA to build (optional; defaults to current branch HEAD). Use this from `git bisect run` or for one-off historic rebuilds.'
         required: false
-      firmware_ref:
-        description: 'OpenIPC/firmware ref (SHA/tag/branch) to clone — for cross-repo bisect of size/regression issues. Defaults to firmware HEAD.'
+      firmware_repo:
+        description: 'Firmware repository to build.'
         required: false
+        default: 'https://github.com/ArthurKoba/openipc-firmware.git'
+      firmware_ref:
+        description: 'Firmware ref (SHA/tag/branch). Defaults to repository HEAD.'
+        required: false
+      rebuild_packages:
+        description: 'Comma-separated packages to rebuild from source while keeping the persistent Buildroot output.'
+        required: false
+        default: 'divinus'
+      clean_output:
+        description: 'Discard the persistent Buildroot output for this platform before building.'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   resolve:
@@ -39,7 +52,7 @@ jobs:
   buildroot:
     name: Firmware (${{inputs.platform}})
     needs: resolve
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, openipc-builder]
 
     steps:
       - name: Checkout source
@@ -47,25 +60,49 @@ jobs:
         with:
           ref: ${{ needs.resolve.outputs.ref }}
 
-      - name: Prepare firmware
+      - name: Prepare persistent local caches
         run: |
-          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
-          echo CACHE_DATE=$(date +%m) >> ${GITHUB_ENV}
+          mkdir -p /runner/cache/ccache
+          mkdir -p /runner/cache/buildroot-dl
+          mkdir -p /runner/cache/buildroot-output
+          mkdir -p /runner/cache/git
+          rm -rf "${HOME}/.ccache"
+          ln -s /runner/cache/ccache "${HOME}/.ccache"
+          echo "BR2_DL_DIR=/runner/cache/buildroot-dl" >> "${GITHUB_ENV}"
 
-      - name: Setup ccache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/ccache
-          key: ${{inputs.platform}}-${{env.CACHE_DATE}}
+          REMOTE='${{ inputs.firmware_repo }}'
+          REF='${{ inputs.firmware_ref }}'
+          KEY=$(printf '%s' "$REMOTE" | sha256sum | cut -c1-16)
+          OUTPUT_KEY=$(printf '%s\n%s' "$REMOTE" "$REF" | sha256sum | cut -c1-16)
+          MIRROR="/runner/cache/git/firmware-${KEY}.git"
+          if [ -d "$MIRROR" ]; then
+            git --git-dir="$MIRROR" remote set-url origin "$REMOTE"
+            git --git-dir="$MIRROR" remote update --prune
+          else
+            git clone --mirror "$REMOTE" "$MIRROR"
+          fi
+          OUTPUT_ROOT="/runner/cache/buildroot-output/${OUTPUT_KEY}"
+          LEGACY_OUTPUT="/runner/cache/buildroot-output/${{ inputs.platform }}"
+          mkdir -p "$OUTPUT_ROOT"
+          if [ -d "$LEGACY_OUTPUT" ] && [ ! -e "$OUTPUT_ROOT/${{ inputs.platform }}" ]; then
+            mv "$LEGACY_OUTPUT" "$OUTPUT_ROOT/${{ inputs.platform }}"
+          fi
+          echo "OPENIPC_FW_REPO=$MIRROR" >> "${GITHUB_ENV}"
+          echo "OPENIPC_OUTPUT_ROOT=$OUTPUT_ROOT" >> "${GITHUB_ENV}"
 
-      # See master.yml for the rationale — builder.sh rm -rf's openipc/
-      # every run, so dl/ has to live outside via BR2_DL_DIR.
-      - name: Setup dl cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/builder-dl
-          key: builder-dl-${{env.CACHE_DATE}}
-          restore-keys: builder-dl-
+      - name: Ensure Buildroot host dependencies
+        run: |
+          need_install=0
+          for cmd in file bc cpio rsync unzip wget lzop make gcc g++ python3 pkg-config; do
+            command -v "$cmd" >/dev/null 2>&1 || need_install=1
+          done
+          dpkg -s libncurses-dev libssl-dev >/dev/null 2>&1 || need_install=1
+          if [ "$need_install" -eq 1 ]; then
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+              automake autotools-dev bc build-essential cpio curl file git libncurses-dev \
+              libssl-dev libtool lzop make pkg-config python3 python3-pip rsync tree unzip wget xz-utils
+          fi
 
       - name: Refresh moving-ref package downloads
         run: |
@@ -75,7 +112,7 @@ jobs:
           # Covers both the dash form (<pkg>-<ref>.tar.gz, e.g. majestic-webui-dist) and
           # the dot form (<pkg>.<ref>.tar.bz2, e.g. majestic.t31.lite.master from S3 —
           # a moving build with no .hash, NOT a content-addressed pin).
-          find /tmp/builder-dl -type f -regextype posix-extended \
+          find /runner/cache/buildroot-dl -type f -regextype posix-extended \
             -regex '.*[-.](HEAD|master|main|dist)\.tar\.(gz|bz2|xz)' \
             -print -delete 2>/dev/null || true
 
@@ -85,33 +122,22 @@ jobs:
           BUILD_SHA:      ${{ needs.resolve.outputs.ref }}
           BUILD_PLATFORM: ${{ inputs.platform }}
           OPENIPC_FW_REV: ${{ inputs.firmware_ref }}
+          OPENIPC_REBUILD_PACKAGES: ${{ inputs.rebuild_packages }}
+          OPENIPC_CLEAN_OUTPUT: ${{ inputs.clean_output }}
         run: |
           export GIT_HASH=$(git rev-parse --short ${GITHUB_SHA})
           export GIT_BRANCH=${GITHUB_REF_NAME}
           echo GIT_HASH=${GIT_HASH} >> ${GITHUB_ENV}
           echo GIT_BRANCH=${GIT_BRANCH} >> ${GITHUB_ENV}
 
-          mkdir -p /tmp/ccache
-          ln -s /tmp/ccache ${HOME}/.ccache
-
-          mkdir -p /tmp/builder-dl
-          export BR2_DL_DIR=/tmp/builder-dl
+          mkdir -p /runner/cache/ccache
+          mkdir -p /runner/cache/buildroot-dl
+          export BR2_DL_DIR=/runner/cache/buildroot-dl
 
           NAME=${{inputs.platform}}
-          # Retry budget for transient upstream toolchain/CDN flakes
-          # (matches master.yml + OpenIPC/firmware/build-one.yml).
-          backoffs="30 60 120 300 600 1200"
-          attempt=1
-          for sleep_for in $backoffs ""; do
-            bash builder.sh ${NAME} && break
-            if [ -z "$sleep_for" ]; then
-              echo "::error::build failed after ${attempt} attempts"
-              exit 1
-            fi
-            echo "::warning::attempt ${attempt} failed, retrying after ${sleep_for}s"
-            sleep "$sleep_for"
-            attempt=$((attempt + 1))
-          done
+          # Development builds must fail fast on deterministic compiler/configuration
+          # errors. Retrying the same local failure only hides the root cause.
+          bash builder.sh "${NAME}"
           cd openipc
 
           TIME=$(date -d @${SECONDS} +%M:%S)

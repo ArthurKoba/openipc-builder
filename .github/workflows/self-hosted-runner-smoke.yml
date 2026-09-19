@@ -1,0 +1,28 @@
+name: Self-hosted runner smoke test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, linux, x64, openipc-builder]
+    timeout-minutes: 10
+    steps:
+      - name: Runner info
+        run: |
+          uname -a
+          id
+          df -h
+
+      - name: Docker
+        run: |
+          docker version
+          docker info
+
+      - name: Buildx
+        run: |
+          docker buildx version
+          docker buildx ls
