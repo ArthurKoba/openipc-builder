@@ -92,6 +92,7 @@ VStarcam C43S(B)         SSC333       JXF37     MT7601U_USB      NOR_16M   in pr
 VStarcam CS55            T31N         GC2053    RTL8188FU_USB    NOR_16M   in progress
 VStarcam C8622           T23N         SC2336P   AIC8800DL_?      NOR_8M    **INIT** - in progress
 XiongMai 85H50AI         HI3516EV300  IMX335    -                NOR_8M    testing, motorized zoom+focus (pelco-xm)
+XVI ISI-2010C            T31N         GC2053    -                NOR_8M    done
 VStarcam C8892WIP        HI3518EV200  AR0237    MT7601U_USB      NOR_16M   done
 VStarcam C8896WIP        GK7102C_A    GC2033    RTL8189ES_SDIO   NOR_8M    wip
 Wansview Q5 1080p        T21Z         OV2735B   RTL8188FU_USB    NOR_16M   in progress
@@ -109,6 +110,54 @@ ZTE K545                 T31X         SC4336    ATBM6012B_USB    NOR_16M   done
 4G Camera XG521 V1.2     GK7202V300   GC1054    EC800E-CN_USB    NOR_8M    done
 XM IPG-G3-WR             GK7202V300   JXH63     ATBM60321S_USB   NOR_8M    done
 ```
+
+
+### XVI ISI-2010C
+
+Profile: `t31_lite_xvi-isi-2010c` (Ingenic T31N, GC2053, 64 MiB RAM,
+8 MiB SPI NOR, wired Ethernet). Build with `./builder.sh t31_lite_xvi-isi-2010c`.
+
+The first-boot customizer selects GC2053 and H.264, enables automatic day/night
+with `lightSensorPin=16`, and sets the IR-cut pair to `irCutPin1=58` /
+`irCutPin2=57`. No Majestic backlight GPIO or transition-delay workaround is
+assigned. The resulting Builder image was flashed with a clean overlay and
+hardware-tested on the physical XVI ISI-2010C. H.264 video, wired Ethernet,
+automatic and manual day/night switching, both IR-cut transitions, reboot
+persistence and sustained streaming were confirmed working. The profile does
+not override the existing U-Boot memory split.
+
+The board has no Wi-Fi radio, SD/MMC socket or populated/powered USB host path.
+A small kernel fragment disables those subsystems and FAT/VFAT without copying
+the generic T31 kernel config. An empty board `/etc/modules` replaces the common
+vfat/exfat autoload list. The defconfig selects only GC2053 sensor support and
+omits Wi-Fi, QR provisioning and separate motor packages. The device exclude
+list additionally removes the unused `motor.ko`, `sample_pwm_core.ko` and
+`sample_pwm_hal.ko` installed by `ingenic-opensdk`; its three literal paths were
+checked against the initial rootfs, the module dependency list and `load_ingenic`.
+No wildcard or already-absent sensor entries are used. Common network/diagnostic
+scripts and BusyBox tools remain shared rather than forking their callers.
+
+Audio is deliberately retained for a later hardware modification: the T31 audio
+module, SDK libraries and Opus are present, while microphone input and speaker
+output are disabled by the common Majestic defaults. No speaker GPIO is forced.
+This is software availability, not a tested microphone/speaker circuit on the
+stock camera.
+
+Final local build and hardware acceptance (2026-09-20):
+`./builder.sh t31_lite_xvi-isi-2010c` completed successfully with 29 packages,
+10 kernel modules and 16 removed files. `rootfs.squashfs.t31` is 3,792,896
+bytes, leaving 1,416 KiB rootfs headroom; kernel headroom is 637 KiB.
+
+The image was flashed with a clean overlay and cold-booted on the physical
+camera. Wired Ethernet, GC2053/ISP, H.264 1920x1080 streaming, GPIO57/58
+IR-cut control, automatic day/night switching, manual night-mode switching,
+reboot persistence and sustained streaming all passed hardware acceptance.
+
+Boot logs confirmed the expected 8 MiB NOR layout, 100/Full Ethernet,
+successful AVPU/ISP initialization, GC2053 detection and stream-on, GPIO57/58
+claims, and T31 audio codec/I2S initialization. The stock board has no
+populated microphone/speaker circuit, so external audio hardware acceptance
+remains outside this device profile.
 
 
 ### Compatibility and clones

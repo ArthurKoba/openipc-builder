@@ -1,0 +1,7 @@
+# No pan/tilt motor or PWM peripheral is populated on XVI ISI-2010C.
+# Literal paths verified against the PR #5 T31 Lite rootfs; excludes do not
+# expand shell globs. The T31 loader does not load these three modules, and
+# none of the retained modules depends on them.
+/lib/modules/3.10.14__isvp_swan_1.0__/ingenic/motor.ko
+/lib/modules/3.10.14__isvp_swan_1.0__/ingenic/sample_pwm_core.ko
+/lib/modules/3.10.14__isvp_swan_1.0__/ingenic/sample_pwm_hal.ko

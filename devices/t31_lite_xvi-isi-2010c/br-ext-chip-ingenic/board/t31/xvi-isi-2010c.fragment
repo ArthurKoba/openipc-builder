@@ -1,0 +1,34 @@
+# XVI ISI-2010C hardware population:
+# Ingenic T31N, 64 MiB DDR, 8 MiB SPI NOR, GC2053 and wired Ethernet.
+#
+# The retail board has no SD/MMC socket, no Wi-Fi radio and no populated/used
+# USB host path. Keep the T31 internal audio codec/I2S support: microphone and
+# speaker circuitry is not populated on this model, but the SoC audio path is
+# intentionally available for hardware modification.
+
+# No SD/MMC or SDIO device is populated.
+# CONFIG_MMC is not set
+# CONFIG_JZMMC_V12 is not set
+# CONFIG_JZMMC_V12_MMC0 is not set
+# CONFIG_JZMMC_V12_MMC1 is not set
+
+# No Wi-Fi hardware is fitted.
+# CONFIG_WIRELESS is not set
+# CONFIG_WLAN is not set
+# CONFIG_CFG80211 is not set
+# CONFIG_MAC80211 is not set
+# CONFIG_RTLWIFI is not set
+# CONFIG_RTL8192CU is not set
+# CONFIG_RTL8192C_COMMON is not set
+
+# USB pads exist on the PCB, but the retail camera has no populated USB path
+# and no 5 V supply to it.
+# CONFIG_USB_SUPPORT is not set
+# CONFIG_USB is not set
+# CONFIG_USB_JZ_DWC2 is not set
+# CONFIG_USB_USBNET is not set
+# CONFIG_USB_SERIAL is not set
+
+# With no removable block storage there is no FAT/VFAT consumer.
+# CONFIG_FAT_FS is not set
+# CONFIG_VFAT_FS is not set

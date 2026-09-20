@@ -1,0 +1,2 @@
+# XVI ISI-2010C has no removable storage.
+# Override OpenIPC's common vfat/exfat module list with an empty board list.
