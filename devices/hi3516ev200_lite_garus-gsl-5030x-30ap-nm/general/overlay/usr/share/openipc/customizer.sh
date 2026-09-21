@@ -14,10 +14,10 @@ cli -s .video0.fps 20
 cli -s .video0.bitrate 4096
 cli -s .video1.enabled false
 
-# No microphone/speaker in the target use. Shared Majestic/MPP dependencies
-# remain installed; no audio power GPIO is configured or driven.
-cli -s .audio.enabled false
-cli -s .audio.outputEnabled false
+# The three-pin audio header is hardware-proven: common ground, microphone
+# input and speaker output all pass a loopback signal. Keep the upstream audio
+# stack available, but do not force audio enabled or disabled for this profile.
+# Runtime audio state belongs to the owner/application.
 
 # GPIO15 is a digital 0/3.3 V status INPUT from the autonomous IR board.
 # Majestic owns only IR-cut pulses and colour/mono switching, not the lamps.

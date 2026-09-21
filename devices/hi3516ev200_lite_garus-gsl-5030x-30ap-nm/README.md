@@ -26,7 +26,7 @@ SC4236/SC4239 or add an upscale just to reproduce the advertised pixel count.
 | Light status | GPIO15 / GPIO1_7, input | Light/dark transitions observed after GPIO mux selection; external digital 0/3.3 V |
 | IR-cut | GPIO8 / GPIO1_0 and GPIO9 / GPIO1_1 | Individual 200 ms pulses moved the filter both ways |
 | IR illumination | Autonomous external light board | Its own detector switches LEDs; no CPU lamp output configured |
-| Audio | Capture and playback disabled | Not required; reserved pads do not establish populated audio hardware |
+| Audio | 3-pin header: common ground, microphone input, speaker output | Hardware loopback confirmed capture and playback; signal quality was not characterized. Support is retained and this profile does not force the runtime audio state |
 | White lamp, PTZ, AF, Wi-Fi, USB, SD | Not supported by this target | No speculative GPIOs, peripherals or drive sequences |
 
 The stock product data identified IRStatusGpio `[1,7]` and IRCutGpios `[1,0]` /
@@ -50,11 +50,14 @@ latter.** Its Sony name is not evidence that it is unused on this camera.
 
 Keep shared MPP libraries and `open_*` modules: the EV200 loader still calls
 `insert_audio` unconditionally. Majestic's package explicitly depends on Opus,
-Ogg, libevent, mbedTLS and json-c. Disabling audio operation is not an audio-free
-SDK binary build; deleting these dependencies or cloning the whole loader to skip
-them is not justified here. The unused audio power GPIO is never enabled.
+Ogg, libevent, mbedTLS and json-c. The three-pin audio header is hardware-proven,
+so these paths are functional capability rather than speculative dead weight.
+The profile deliberately does not write `.audio.enabled` or
+`.audio.outputEnabled`: audio remains available for users who need it without
+making it part of this camera's default workload. GPIO52 remains unconfigured;
+the loopback test does not establish that optional stock assignment as required.
 
-SSH, UART, DHCP, IPv4/IPv6, NFS recovery support, curl, environment tools, native
+SSH, DHCP, IPv4/IPv6, NFS recovery support, curl, environment tools, native
 `ipcinfo`, normal update tools, fonts, WebUI and the video/ISP stack remain.
 CPIO/SquashFS build selections and compiler/ABI flags are unchanged. No password,
 MAC, IP, memory split, flash map or generic upgrade URL is baked into the profile.
@@ -63,8 +66,8 @@ not pre-accepted or bypassed by this customizer.
 
 ## Boot ownership
 
-`customizer.sh` sets first-boot video/audio/night-mode defaults. It fails on a
-failed command and does not write MMIO. Existing user settings outside its small
+`customizer.sh` sets first-boot video and night-mode defaults and intentionally
+leaves audio state untouched. It fails on a failed command and does not write MMIO. Existing user settings outside its small
 explicit set are left alone. `muxes.sh` is unchanged from the previous profile;
 S30customizer invokes it on **every boot**, outside the `/etc/custom.ok` guard,
 before S70vendor and S95majestic. It does not fetch a remote `ipctool` plugin.
@@ -94,9 +97,9 @@ never treat the existence of `custom.ok` as proof the defaults succeeded.
 
 ## Reviewed build inputs
 
-Review date: 2026-09-21. Builder baseline: `10aeb370a74d36a59415e1a61b38aac138c0a99f`
-on `device/garus-gsl-5030x-30ap-nm`. The branch's builder.sh matches the inspected
-master; unrelated camera commits were not merged into it.
+Review date: 2026-09-21. The device branch is synchronized with builder
+`master` through `9753e10c09fc072a76bc39bcb5cb7ce1ca050bf8`; the profile changes
+remain isolated on `device/garus-gsl-5030x-30ap-nm`.
 
 Firmware authority: **OpenIPC/firmware**
 `6f03cc45a1165ad45ab60cb81984b674c14837b0`, not the stale master of the owner's
@@ -181,8 +184,10 @@ is not such a backup. No erase/program/reset commands are part of this draft.
 
 Hardware acceptance still required: fresh boot and a second cold boot after
 `custom.ok` exists; explicit light/dark level and filter-direction validation;
-stable 1080p video/RTSP and snapshots with no audio track or playback; no CPU lamp
-control or held coil; Ethernet/SSH and settings retention. An unclaimed installation
+stable 1080p video/RTSP and snapshots; audio dependencies and controls still
+available without being forced on; no CPU lamp control or held coil; Ethernet/SSH
+and settings retention. The already observed audio loopback proves the basic
+hardware path, but audio quality is not a release gate for this camera profile. An unclaimed installation
 may require the owner to complete password/EULA setup before normal streaming.
 
 An upgrade preserving `custom.ok` will NOT apply these first-boot defaults. Back up

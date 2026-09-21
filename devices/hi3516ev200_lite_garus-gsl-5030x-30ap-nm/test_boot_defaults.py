@@ -32,7 +32,6 @@ EXPECTED = {
     '.video0.enabled': 'true', '.video0.codec': 'h264',
     '.video0.size': '1920x1080', '.video0.fps': '20', '.video0.bitrate': '4096',
     '.video1.enabled': 'false',
-    '.audio.enabled': 'false', '.audio.outputEnabled': 'false',
     '.nightMode.lightMonitor': 'true', '.nightMode.lightSensorPin': '15',
     '.nightMode.lightSensorInvert': 'false', '.nightMode.irCutEnabled': 'true',
     '.nightMode.irCutPin1': '8', '.nightMode.irCutPin2': '9',
@@ -95,7 +94,8 @@ def profile_checks(args):
         assert d.get('BR2_PACKAGE_' + suffix) == 'n', suffix
     for suffix in ('MAJESTIC', 'MAJESTIC_WEBUI', 'MAJESTIC_FONTS', 'DROPBEAR_OPENIPC',
                    'UBOOT_TOOLS', 'YAML_CLI', 'IPCTOOL', 'HISILICON_OPENSDK',
-                   'HISILICON_OSDRV_HI3516EV200', 'LIBOGG_OPENIPC', 'OPUS_OPENIPC'):
+                   'HISILICON_OSDRV_HI3516EV200', 'LIBEVENT_OPENIPC',
+                   'LIBOGG_OPENIPC', 'OPUS_OPENIPC', 'MBEDTLS_OPENIPC'):
         assert d.get('BR2_PACKAGE_' + suffix) == 'y', suffix
     assert d['BR2_OPENIPC_FLASH_SIZE'] == '"8"'
     assert d['BR2_OPENIPC_SOC_MODEL'] == '"hi3516ev200"'
@@ -250,7 +250,7 @@ def main():
             state = run(paths['customizer'], initial(fail_command='cli:.video0.size'), success=False)
             assert state['calls'][-1] == ['cli', '-s', '.video0.size', '1920x1080']
             cases += 1
-            print(variant + ': ash syntax, RMW/preservation, idempotency, failure paths and 1080p/video-only defaults OK')
+            print(variant + ': ash syntax, RMW/preservation, idempotency, failure paths and 1080p defaults with audio state untouched OK')
     print(str(cases) + ' host cases passed; NOT a firmware build or hardware acceptance')
 
 
