@@ -14,6 +14,7 @@
 # CONFIG_USB_GADGET is not set
 # CONFIG_PHY_HISI_XVP_USB2 is not set
 # CONFIG_MMC is not set
+# CONFIG_VFAT_FS is not set
 # CONFIG_FAT_FS is not set
 
 # This image boots SquashFS on SPI NOR with a JFFS2 writable overlay.
