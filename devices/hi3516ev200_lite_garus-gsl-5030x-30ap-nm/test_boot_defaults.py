@@ -35,7 +35,8 @@ EXPECTED = {
     '.nightMode.lightMonitor': 'true', '.nightMode.lightSensorPin': '15',
     '.nightMode.lightSensorInvert': 'false', '.nightMode.irCutEnabled': 'true',
     '.nightMode.irCutPin1': '8', '.nightMode.irCutPin2': '9',
-    '.nightMode.colorToGray': 'true', '.nightMode.backlightEnabled': 'false',
+    '.nightMode.colorToGray': 'true', '.nightMode.transitionDelayMs': '150',
+    '.nightMode.backlightEnabled': 'false',
 }
 MOCK = '''import json, os, sys
 from pathlib import Path

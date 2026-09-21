@@ -24,7 +24,7 @@ SC4236/SC4239 or add an upscale just to reproduce the advertised pixel count.
 | Function | Board setting | Evidence / limit |
 | --- | --- | --- |
 | Light status | GPIO15 / GPIO1_7, input | Light/dark transitions observed after GPIO mux selection; external digital 0/3.3 V |
-| IR-cut | GPIO8 / GPIO1_0 and GPIO9 / GPIO1_1 | Individual 200 ms pulses moved the filter both ways |
+| IR-cut | GPIO8 / GPIO1_0 and GPIO9 / GPIO1_1 | Individual 200 ms pulses moved the filter both ways; day/night switching is hardware-accepted with `transitionDelayMs=150` |
 | IR illumination | Autonomous external light board | Its own detector switches LEDs; no CPU lamp output configured |
 | Audio | 3-pin header: common ground, microphone input, speaker output | Hardware loopback confirmed capture and playback; signal quality was not characterized. Support is retained and this profile does not force the runtime audio state |
 | White lamp, PTZ, AF, Wi-Fi, USB, SD | Not supported by this target | No speculative GPIOs, peripherals or drive sequences |
@@ -84,9 +84,9 @@ The reviewed EV200/demo/MIPI `open_sys_config` path does not overwrite these two
 settings. GPIO8/9 were already GPIO-muxed on the tested camera. Majestic alone owns
 their short pulses; do not replace that with permanent output levels.
 
-`lightSensorInvert=false` and coil order 8/9 are preserved, **not newly accepted**:
-which physical light state maps to 0/1 and which coil direction is daytime still
-need a complete image/filter test. The published pinmux API is not another pad
+`lightSensorInvert=false`, coil order 8/9 and the resulting day/night image state are
+now hardware-accepted on the tested camera. `transitionDelayMs=150` is retained as
+the tested intra-transition pause between the picture-mode change and IR-cut movement. The published pinmux API is not another pad
 owner in this draft: do not configure an independent persistent override for
 GPIO15 while this every-boot board hook owns it.
 
@@ -182,12 +182,12 @@ claim/setup assets and both boot hooks in the built image. Confirm the live flas
 map and a restorable backup independently; a damaged/mixed stock research dump
 is not such a backup. No erase/program/reset commands are part of this draft.
 
-Hardware acceptance still required: fresh boot and a second cold boot after
-`custom.ok` exists; explicit light/dark level and filter-direction validation;
-stable 1080p video/RTSP and snapshots; audio dependencies and controls still
-available without being forced on; no CPU lamp control or held coil; Ethernet/SSH
-and settings retention. The already observed audio loopback proves the basic
-hardware path, but audio quality is not a release gate for this camera profile. An unclaimed installation
+Hardware observations now confirmed on the locally built 202609210723 image:
+1080p picture, microphone/speaker audio path and automatic day/night + IR-cut
+switching all work on the target camera. The tested runtime also uses
+`nightMode.transitionDelayMs=150`. A rebuild is still required after folding that
+value into this source revision, and a second cold-boot/settings-retention pass is
+still required before treating the resulting bytes as fully accepted. An unclaimed installation
 may require the owner to complete password/EULA setup before normal streaming.
 
 An upgrade preserving `custom.ok` will NOT apply these first-boot defaults. Back up

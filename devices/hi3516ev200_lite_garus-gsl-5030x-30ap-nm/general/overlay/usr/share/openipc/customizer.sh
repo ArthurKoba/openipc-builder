@@ -28,6 +28,7 @@ cli -s .nightMode.irCutEnabled true
 cli -s .nightMode.irCutPin1 8
 cli -s .nightMode.irCutPin2 9
 cli -s .nightMode.colorToGray true
+cli -s .nightMode.transitionDelayMs 150
 cli -s .nightMode.backlightEnabled false
 
 # Preserve the existing polarity/pin order until full day/night acceptance.
