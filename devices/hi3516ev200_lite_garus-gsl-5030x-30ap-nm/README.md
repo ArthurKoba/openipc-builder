@@ -1,114 +1,192 @@
 # GARUS GSL-5030X-30AP-NM — BLK16EV2-4339P-38X38
 
 Target: `hi3516ev200_lite_garus-gsl-5030x-30ap-nm`.
-Hi3516EV200, 64 MiB RAM, 8 MiB SPI NOR, wired Ethernet.
-This is a development profile in the owner's fork, not an upstream-ready release.
+Hi3516EV200, 64 MiB RAM, 8 MiB SPI NOR, wired Ethernet, fixed-focus lens.
+**Source draft in the owner's fork. No compiled image or hardware acceptance of
+this revision. Not an upstream submission or an installation-ready release.**
 
-## Scope and evidence
+## Target and evidence
 
-- Keep the working `sc2315e` driver and `sc2315e_i2c_1080p.ini`.
-  Individual camera tests established 1080p video with this driver. Stock
-  `Resolution="3M"`/25 fps settings and `CaptureSizes.3M=[2304,1296,1296]`
-  are configuration evidence, not proof of native sensor output or its rate.
-  Native 3MP remains separate reverse-engineering work.
-- GPIO15 / GPIO1_7: external IR-board digital status input, 0/3.3 V.
-  Light/dark transitions were observed with `ipctool gpio scan` after selecting
-  GPIO mode. A sysfs input alone had read constant zero with the wrong pad mux.
-- GPIO8 / GPIO1_0 and GPIO9 / GPIO1_1: IR-cut bridge controls. Individual
-  200 ms pulses moved the filter in both directions. Leave pulse generation
-  to Majestic; do not hold a coil on from this boot hook.
-- The front IR board controls its LEDs autonomously with its own light detector.
-  There is no white/warm lamp on this camera. Do not configure `backlightPin`,
-  GPIO16 or lamp PWM, and do not copy those fields from the generic XM profile.
-- Audio capture/playback are outside this camera's target use and are disabled.
-  A reserved connector or audio fields in generic XM firmware do not establish
-  populated, working audio hardware. GPIO52 is not driven or assumed safe.
+The supported target is the working **SC2315E-family 1920x1080 linear path**:
+`libsns_sc2315e.so` and `sc2315e_i2c_1080p.ini`. The individual camera's earlier
+OpenIPC log showed H.264 1920x1080 at 20 fps and 4096 kbit/s. These conservative
+first-boot settings are now explicit; only the main stream is enabled by default.
+JPEG snapshots and ordinary WebUI/RTSP/ONVIF functionality remain available.
 
-The stock `IPC_85HF30T` product data identified IRStatusGpio `[1,7]` and
-IRCutGpios `[1,0]`/`[1,1]`; the individual hardware tests confirmed these three
-signals. Other stock GPIO assignments are not enabled merely because they exist.
+The April stock dump and December recovery analysis found 1920x1080 input geometry
+in the SC2315E path. Stock `CaptureSizes.3M=[2304,1296,1296]` and `DstFpsMax.3M=20`
+are output configuration evidence, not proof of native 3MP or a measured stock
+stream. The physical die name and the executed scaling path were not established.
+Native 3MP, HDR, a sensor replacement and further sensor reverse engineering are
+**outside this draft**, not unfinished requirements for this profile. Do not select
+SC4236/SC4239 or add an upscale just to reproduce the advertised pixel count.
 
-## Boot responsibilities
+| Function | Board setting | Evidence / limit |
+| --- | --- | --- |
+| Light status | GPIO15 / GPIO1_7, input | Light/dark transitions observed after GPIO mux selection; external digital 0/3.3 V |
+| IR-cut | GPIO8 / GPIO1_0 and GPIO9 / GPIO1_1 | Individual 200 ms pulses moved the filter both ways |
+| IR illumination | Autonomous external light board | Its own detector switches LEDs; no CPU lamp output configured |
+| Audio | Capture and playback disabled | Not required; reserved pads do not establish populated audio hardware |
+| White lamp, PTZ, AF, Wi-Fi, USB, SD | Not supported by this target | No speculative GPIOs, peripherals or drive sequences |
 
-`customizer.sh` supplies first-boot defaults: `sensor=sc2315e`, audio input/output
-false, light monitoring on GPIO15, IR-cut on GPIO8/9, colour/mono switching,
-and Majestic lamp control disabled. It does not write pinmux registers.
+The stock product data identified IRStatusGpio `[1,7]` and IRCutGpios `[1,0]` /
+`[1,1]`; individual hardware tests confirmed those signals. GPIO16, audio-power
+GPIO52 and tentative Ethernet LED assignments are not driven. Do not infer pins
+from optional fields in generic XM configuration.
 
-`muxes.sh` restores the GPIO15 input on **every boot**, even when
-`/etc/custom.ok` exists. The native `S30customizer` calls it outside the one-time
-customizer guard, before `S70vendor` and `S95majestic`. No extra init service,
-remote ipctool download or per-boot environment/config rewrite is needed.
+## What is reduced, and what must remain
 
-Only two registers can be changed, using read-modify-write and readback:
+The defconfig disables `MAJESTIC_AF`, `MOTORS`, `WIREGUARD_LINUX_COMPAT`,
+`WIREGUARD_TOOLS` and `VTUND_OPENIPC`. The board kernel fragment disables the
+wireless stack, USB host/gadget and its HiSilicon USB PHY, MMC/FAT, NAND/UBI/YAFFS
+and TUN. It composes with the shared EV200 kernel config; no duplicated generic
+config, kernel source patch or shared SDK loader override is introduced.
+
+The literal exclusion list has 65 entries at the reviewed firmware revision:
+33 unrelated sensor libraries, 28 unrelated capture presets, two unused IQ files,
+the CamHi motor module and the manual `ircut_demo`. The selected sensor and preset
+remain. **Keep `iq/default.ini` AND `iq/imx307.ini`: the former is a symlink to the
+latter.** Its Sony name is not evidence that it is unused on this camera.
+
+Keep shared MPP libraries and `open_*` modules: the EV200 loader still calls
+`insert_audio` unconditionally. Majestic's package explicitly depends on Opus,
+Ogg, libevent, mbedTLS and json-c. Disabling audio operation is not an audio-free
+SDK binary build; deleting these dependencies or cloning the whole loader to skip
+them is not justified here. The unused audio power GPIO is never enabled.
+
+SSH, UART, DHCP, IPv4/IPv6, NFS recovery support, curl, environment tools, native
+`ipcinfo`, normal update tools, fonts, WebUI and the video/ISP stack remain.
+CPIO/SquashFS build selections and compiler/ABI flags are unchanged. No password,
+MAC, IP, memory split, flash map or generic upgrade URL is baked into the profile.
+The upstream owner-claim/authentication and Majestic EULA flow is preserved; it is
+not pre-accepted or bypassed by this customizer.
+
+## Boot ownership
+
+`customizer.sh` sets first-boot video/audio/night-mode defaults. It fails on a
+failed command and does not write MMIO. Existing user settings outside its small
+explicit set are left alone. `muxes.sh` is unchanged from the previous profile;
+S30customizer invokes it on **every boot**, outside the `/etc/custom.ok` guard,
+before S70vendor and S95majestic. It does not fetch a remote `ipctool` plugin.
 
 | Register | Mask / requested bits | Purpose |
 | --- | --- | --- |
-| `0x120B1400` | `0x80` / `0` | GPIO bank 1 direction: GPIO15 input, other pins preserved |
-| `0x120C001C` | `0x0f` / `2` | GPIO1_7 pad function, electrical configuration preserved |
+| `0x120B1400` | `0x80` / `0` | GPIO15 input; preserve other directions |
+| `0x120C001C` | `0x0f` / `2` | GPIO1_7 function; preserve electrical settings |
 
-Input direction is verified **before** selecting the GPIO pad. Repeated execution
-is idempotent; failed reads/writes or failed readback return nonzero. The hook
-checks the SoC and never writes GPIO data, flash, IR LED control or audio power.
-Note: the native S30 script reports the hook output but does not gate all later
-services on its exit status; a reported mux error must not be treated as success.
-GPIO8/9 already used the GPIO function in the observed camera boot. Their output
-state and pulsing remain Majestic's responsibility.
+Direction is verified before selecting the GPIO pad. Both changes use read-modify-
+write and readback, with SoC and malformed-read guards. Repeated execution is
+idempotent. No GPIO data, flash, lamp, PWM or coil-drive write is made by this hook.
+The reviewed EV200/demo/MIPI `open_sys_config` path does not overwrite these two
+settings. GPIO8/9 were already GPIO-muxed on the tested camera. Majestic alone owns
+their short pulses; do not replace that with permanent output levels.
 
-Source contracts inspected for this change:
+`lightSensorInvert=false` and coil order 8/9 are preserved, **not newly accepted**:
+which physical light state maps to 0/1 and which coil direction is daytime still
+need a complete image/filter test. The published pinmux API is not another pad
+owner in this draft: do not configure an independent persistent override for
+GPIO15 while this every-boot board hook owns it.
 
-- [S30customizer](https://github.com/OpenIPC/firmware/blob/master/general/overlay/etc/init.d/S30customizer):
-  every-boot hook (inspected blob `34655932dfcda42279f724016320007d5bacf85a`).
-- [ipctool reginfo.c](https://github.com/OpenIPC/ipctool/blob/master/src/reginfo.c):
-  `EV200_iocfg_reg50` maps `0x120C001C` selector 2 to `GPIO1_7`; HiSilicon
-  pad function changes use a low-nibble mask.
-- [open_sys_config](https://github.com/OpenIPC/openhisilicon/blob/5ccb5e9a276d0d4514551fbe69c7a423de2d09d2/kernel/sys_config/sys_config.c):
-  the selected EV200/demo/MIPI path does not overwrite this pad after S30.
-  Recheck this ordering if the vendor package changes.
-- [Majestic settings](https://github.com/OpenIPC/wiki/blob/master/en/majestic-config.md):
-  `audio.enabled`, `audio.outputEnabled`, `nightMode.lightSensorPin`,
-  `irCutEnabled` and `backlightEnabled` are separate switches.
+S30customizer itself still stamps `custom.ok` after invoking a failed customizer
+and does not stop subsequent services on a mux error. Our local nonzero returns
+do not repair that shared lifecycle limitation. Inspect the boot log and settings;
+never treat the existence of `custom.ok` as proof the defaults succeeded.
 
-Shared SDK audio modules and Majestic libraries are intentionally retained. The
-current EV200 loader inserts audio modules unconditionally, and removing them or
-Opus/Ogg without dependency validation risks unrelated startup failures. This
-change disables audio operation by default; it is not an audio-free binary build.
+## Reviewed build inputs
 
-## Build and validation
+Review date: 2026-09-21. Builder baseline: `10aeb370a74d36a59415e1a61b38aac138c0a99f`
+on `device/garus-gsl-5030x-30ap-nm`. The branch's builder.sh matches the inspected
+master; unrelated camera commits were not merged into it.
 
-From a checkout of `device/garus-gsl-5030x-30ap-nm`:
+Firmware authority: **OpenIPC/firmware**
+`6f03cc45a1165ad45ab60cb81984b674c14837b0`, not the stale master of the owner's
+firmware mirror. Buildroot is `2024.02.10`; opensdk selects OpenIPC/openhisilicon
+`b922e1999dceb43c1a949d8d76a5110176d8c57a`. The reviewed upstream sources are:
+
+- Firmware `Makefile`, `general/openipc.fragment`, `general/scripts/rootfs_script.sh`:
+  concatenate board defaults with the common fragment; apply exact-path exclusions
+  before late overlays; strip shell comments; enforce NOR image size limits.
+- `general/package/hisilicon-osdrv-hi3516ev200/hisilicon-osdrv-hi3516ev200.mk` and
+  `files/script/load_hisilicon`: sensor/IQ installs, default IQ symlink, MPP/audio
+  load contract; `hisilicon-opensdk.mk`: source sensor inventory and SDK revision.
+- `general/package/majestic/majestic.mk`: runtime dependencies and moving tarball.
+- `general/overlay/etc/init.d/S30customizer`: first-boot versus every-boot hooks.
+- Openhisilicon `kernel/sys_config/sys_config.c` at the SDK revision above:
+  EV200/demo/MIPI mux path; `kernel/Kbuild`: the EV200 set has no UVC module.
+- OpenIPC/wiki `en/majestic-config.md`, inspected on the review date: the literal
+  video, sensor-config, audio and nightMode keys. Validate against the actual
+  Majestic binary's schema too; yaml-cli alone does not validate key names.
+
+Builder overlays `devices/<target>/*` onto a fresh upstream firmware checkout and
+runs `make BOARD=<target>`. `OPENIPC_FW_REV` selects that firmware revision.
+**This is not a complete reproducibility lock**: builder.sh runs `git pull` on
+itself, and Majestic/WebUI and some other inputs use moving download names.
+Capture actual Builder/Firmware revisions, resolved configs, package versions and
+image hashes with the first successful build; do not overwrite the known-good
+archive. Use a dedicated Builder checkout because its `openipc/` is recreated.
+
+## Validation and later build
+
+Run in the root of that dedicated checkout, on the device branch:
 
 ```sh
 python3 devices/hi3516ev200_lite_garus-gsl-5030x-30ap-nm/test_boot_defaults.py
 python3 .github/scripts/ci-matrix.py --self-test
-./builder.sh hi3516ev200_lite_garus-gsl-5030x-30ap-nm
 ```
 
-The host test requires BusyBox and uses mocked `devmem`, `ipcinfo`, `cli` and
-`fw_setenv`; it never accesses hardware. With a firmware checkout, also pass
-`--stripper openipc/general/scripts/strip-shell-comments.awk` to test the exact
-comment-stripped scripts. Tests belong to the host, not the camera rootfs.
+When a full build is explicitly requested, the existing build entry point is:
 
-Validation for this change: 24 host cases passed (source and packaged scripts),
-including ash syntax, preserving unrelated register bits, direction-before-mux,
-idempotency, wrong-SoC rejection, read/write/readback failures and video-only
-defaults. No full firmware build, full-tree CI matrix self-test or hardware boot
-of this revised profile was performed. Do not promote the old individual camera
-tests to acceptance of this new image.
+```sh
+OPENIPC_FW_REV=6f03cc45a1165ad45ab60cb81984b674c14837b0 ./builder.sh hi3516ev200_lite_garus-gsl-5030x-30ap-nm
+```
 
-After a successful build, check image sizes and installed dependencies, then test:
+Afterward the same host test can inspect the real source and output:
 
-1. Fresh first boot and another cold boot with `/etc/custom.ok` already present:
-   `muxes.sh` still runs; GPIO15 is an input and follows the physical light sensor.
-2. Record explicitly which GPIO15 level means dark/light and confirm the filter
-   moves in the matching direction with colour/mono switching. The pre-existing
-   `lightSensorInvert=false` and pin order 8/9 are preserved, not newly claimed as
-   end-to-end polarity validation. Swap/invert only after that observation.
-3. No audio track/playback, unchanged 1080p video, no GPIO/PWM control of the
-   autonomous IR board, and no persistent IR-cut coil drive.
+```sh
+python3 devices/hi3516ev200_lite_garus-gsl-5030x-30ap-nm/test_boot_defaults.py --firmware openipc --stripper openipc/general/scripts/strip-shell-comments.awk --kernel-config openipc/output/build/linux-custom/.config --rootfs openipc/output/target
+```
 
-An upgrade preserving `/etc/custom.ok` also preserves old first-boot settings.
-Such an installation needs an explicit one-time defaults migration after backing
-up `/etc/majestic.yaml`; do not delete the entire overlay or rewrite user settings
-on every boot. No live camera was modified by this repository change.
-The upgrade URL remains unset until a matching artifact is published. Preserve
-per-device MAC/network settings; do not bake one camera's identity into the image.
+The host test needs Python 3.8+ and BusyBox, never root or camera access. The
+optional output arguments require a successful build and are not fake fixtures.
+Source/mock validation for this draft: **32 host cases passed** (source plus exact
+upstream comment-stripped scripts), together with static package/fragment/pruning
+checks. The mock PATH contains only mock tools. The untouched mux baseline and
+the test's upstream stripper were verified against their Git blob IDs.
+
+Full-tree CI selector self-test, resolved Kconfig, SDK/kernel compilation, final
+rootfs/ELF dependency audit, independent review and hardware tests were **not run**.
+The available validation container could not fetch the full Git checkout; MCP
+source reads remained available. Do not promote the host checks to build success.
+
+Expected local archive: `archive/<target>/<timestamp>/`, with
+`openipc.hi3516ev200-nor-lite.tgz`, `uImage.hi3516ev200`,
+`rootfs.squashfs.hi3516ev200`, rootfs tar and size report when generated.
+That TGZ is kernel + rootfs, **not a full 8 MiB flash dump or a new U-Boot**.
+The wrapper is responsible for any later device-specific release naming.
+
+| Existing NOR area | Start | Capacity |
+| --- | --- | --- |
+| U-Boot | `0x000000` | 256 KiB |
+| Environment | `0x040000` | 64 KiB |
+| Kernel | `0x050000` | 2048 KiB |
+| SquashFS rootfs | `0x250000` | 5120 KiB |
+| Writable overlay | `0x750000` | 704 KiB |
+
+Before installation, require kernel <= 2097152 bytes and rootfs <= 5242880 bytes,
+using exact byte counts, not rounded KiB. Check a real resolved kernel config,
+only the selected sensor/preset, valid IQ symlink, full shared-library resolution,
+claim/setup assets and both boot hooks in the built image. Confirm the live flash
+map and a restorable backup independently; a damaged/mixed stock research dump
+is not such a backup. No erase/program/reset commands are part of this draft.
+
+Hardware acceptance still required: fresh boot and a second cold boot after
+`custom.ok` exists; explicit light/dark level and filter-direction validation;
+stable 1080p video/RTSP and snapshots with no audio track or playback; no CPU lamp
+control or held coil; Ethernet/SSH and settings retention. An unclaimed installation
+may require the owner to complete password/EULA setup before normal streaming.
+
+An upgrade preserving `custom.ok` will NOT apply these first-boot defaults. Back up
+`/etc/majestic.yaml` and the environment, review the small customizer delta and
+apply it once through the normal service lifecycle during acceptance. Do not wipe
+rootfs_data, delete all user settings or rerun configuration on every boot. The
+upgrade URL stays unset until a matching, accepted board artifact is published.

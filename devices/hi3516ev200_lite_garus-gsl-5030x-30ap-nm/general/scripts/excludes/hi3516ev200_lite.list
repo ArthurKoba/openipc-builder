@@ -1,3 +1,40 @@
+# GARUS fixed-lens, wired 1080p target. Exact paths, not shell globs.
+# Inventory reviewed at OpenIPC/firmware 6f03cc45a1165ad45ab60cb81984b674c14837b0.
+# Keep libsns_sc2315e.so and sc2315e_i2c_1080p.ini.
+# IMPORTANT: iq/default.ini -> imx307.ini; keep BOTH despite the Sony name.
+# Shared MPP/audio libraries and open_* modules remain required by the loader.
+/etc/sensors/5M_imx335.ini
+/etc/sensors/WDR/5M_imx335.ini
+/etc/sensors/WDR/imx335_i2c_4M.ini
+/etc/sensors/camhi_imx307_i2c_4l_1080p.ini
+/etc/sensors/gc2053_i2c_1080p.ini
+/etc/sensors/gc4653_i2c_4M.ini
+/etc/sensors/high-fps/imx307_1280x720_60fps.ini
+/etc/sensors/high-fps/imx307_1920x1080_60fps.ini
+/etc/sensors/high-fps/imx307_368x304_200fps.ini
+/etc/sensors/high-fps/imx307_640x480_130fps.ini
+/etc/sensors/high-fps/imx335_1280x720_120fps.ini
+/etc/sensors/high-fps/imx335_1296x972_64fps.ini
+/etc/sensors/high-fps/imx335_1920x1080_55fps.ini
+/etc/sensors/high-fps/imx335_2592x1944_45fps.ini
+/etc/sensors/high-fps/imx335_800x480_240fps.ini
+/etc/sensors/imx307_i2c_2l_1080p.ini
+/etc/sensors/imx335_i2c_4M.ini
+/etc/sensors/iq/f23.ini
+/etc/sensors/iq/imx335.ini
+/etc/sensors/jxf22_i2c_1080p.ini
+/etc/sensors/jxf23_i2c_1080p.ini
+/etc/sensors/jxf37_i2c_1080p.ini
+/etc/sensors/sc2231_i2c_1080p.ini
+/etc/sensors/sc2232h_i2c_1080p.ini
+/etc/sensors/sc2239_i2c_1080p.ini
+/etc/sensors/sc3235_i2c_3M.ini
+/etc/sensors/sc3335_i2c_3M.ini
+/etc/sensors/sc4236_i2c_3M.ini
+/etc/sensors/sp2305_i2c_1080p.ini
+/etc/sensors/sp2308_i2c_1080p.ini
+/lib/modules/4.9.37/hisilicon/camhi-motor.ko
+/usr/bin/ircut_demo
 /usr/lib/sensors/libsns_ar0237.so
 /usr/lib/sensors/libsns_bt656.so
 /usr/lib/sensors/libsns_f22.so
@@ -13,6 +50,8 @@
 /usr/lib/sensors/libsns_imx307_2l.so
 /usr/lib/sensors/libsns_imx327.so
 /usr/lib/sensors/libsns_imx327_2l.so
+/usr/lib/sensors/libsns_imx335.so
+/usr/lib/sensors/libsns_imx335_2l.so
 /usr/lib/sensors/libsns_mis2008.so
 /usr/lib/sensors/libsns_os02g10.so
 /usr/lib/sensors/libsns_os05a.so
@@ -29,29 +68,3 @@
 /usr/lib/sensors/libsns_sc500ai.so
 /usr/lib/sensors/libsns_sp2305.so
 /usr/lib/sensors/libsns_sp2308.so
-#
-/etc/sensors/camhi_imx307_i2c_4l_1080p.ini
-/etc/sensors/gc2053_i2c_1080p.ini
-/etc/sensors/gc4653_i2c_4M.ini
-/etc/sensors/imx307_i2c_2l_1080p.ini
-/etc/sensors/jxf22_i2c_1080p.ini
-/etc/sensors/jxf23_i2c_1080p.ini
-/etc/sensors/jxf37_i2c_1080p.ini
-/etc/sensors/sc2231_i2c_1080p.ini
-/etc/sensors/sc2232h_i2c_1080p.ini
-/etc/sensors/sc2239_i2c_1080p.ini
-/etc/sensors/sc3235_i2c_3M.ini
-/etc/sensors/sc3335_i2c_3M.ini
-/etc/sensors/sc4236_i2c_3M.ini
-/etc/sensors/sp2305_i2c_1080p.ini
-/etc/sensors/sp2308_i2c_1080p.ini
-#
-# Keep /usr/lib/sensors/libsns_sc2315e.so and
-# /etc/sensors/sc2315e_i2c_1080p.ini: this is the current known-working
-# fallback while the stock 2304x1296 sensor mode is being reverse-engineered.
-#
-/etc/sensors/iq/f23.ini
-/etc/sensors/high-fps/imx307_1280x720_60fps.ini
-/etc/sensors/high-fps/imx307_1920x1080_60fps.ini
-/etc/sensors/high-fps/imx307_368x304_200fps.ini
-/etc/sensors/high-fps/imx307_640x480_130fps.ini
